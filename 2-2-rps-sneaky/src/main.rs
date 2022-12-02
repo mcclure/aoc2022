@@ -1,6 +1,4 @@
-// Calculates a "score" from a series of A, B, C, X, Y, Z letters representing a rock paper scissors game and orders to win, tie or take a dive
-
-#![allow(unused_parens)]
+// Calculates a "score" from a series of A, B, C, X, Y, Z letters representing a rock paper scissors game
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
@@ -27,22 +25,21 @@ fn main() -> Result<(), Error> {
 		if line.is_empty() { continue } // Blank lines are allowed
 		if line.len() != 3 { return Err(invalid()) }
 		let mut chars = line.chars();
-		let (them_ch, whitespace_ch, us_ch) = (chars.next().ok_or_else(invalid)?, chars.next().ok_or_else(invalid)?, chars.next().ok_or_else(invalid)?);
+		let (them_ch, whitespace_ch, result_ch) = (chars.next().ok_or_else(invalid)?, chars.next().ok_or_else(invalid)?, chars.next().ok_or_else(invalid)?);
 		if !whitespace_ch.is_whitespace() { return Err(invalid()) }
-		let (them, us) = (them_ch as i64 - 'A' as i64,
-			              us_ch   as i64 - 'X' as i64);
-		for v in [us, them] {
-			if (v < 0 || v > 2) { return Err(invalid()) }
-		}
+		let them = them_ch as i64 - 'A' as i64;
+		if them < 0 || them > 2 { return Err(invalid()) }
 
-		let eq = us == them;
-		let win = (us-them + 3)%3 == 1;
-		let mut score: i64 = 0;
-		score += (us + 1);
-		if eq { score += 3 }
-		if win { score += 6 }
+		let us = |margin:i64| { (them + margin + 3)%3 + 1 };
 
-		//println!("{} ({}) {} ({}) {} {} {}", them_ch, them, us_ch, us, if eq {"EQ"} else {"  "}, if win {"WIN"} else {"   "}, score);
+		let score = match result_ch {
+			'X' => us(-1),    // Lose
+			'Y' => us(0) + 3, // Draw
+			'Z' => us(1) + 6, // Win
+			_ => return Err(invalid())
+		};
+
+		//println!("{} ({}) {} {} {}", them_ch, them, if result_ch=='Y' {"EQ"} else {"  "}, if result_ch=='Z' {"WIN"} else {"   "}, score);
 
 		total += score;
 	}
