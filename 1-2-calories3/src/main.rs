@@ -8,6 +8,7 @@ use std::collections::BinaryHeap;
 const SUM_OF:usize = 3;
 
 fn main() -> Result<(), Error> {
+	// Load file from command-line argument or (if none) stdin
 	let filename = std::env::args().fuse().nth(1);
 	let input: Either<BufReader<Stdin>, BufReader<File>> = match &filename {
 		None => either::Left(BufReader::new(stdin())),
@@ -19,6 +20,7 @@ fn main() -> Result<(), Error> {
 	let mut current: i64 = 0;
 	let mut best = BinaryHeap::<i64>::with_capacity(SUM_OF);
 
+	// Scan file
 	loop {
 		let mut chunk_finished = || {
 			// println!("Chunk finished; {} > {}", current, best.peek());
@@ -41,6 +43,7 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
+	// Calculate final score
 	{
 		let mut count = 0;
 		let mut total:i64 = 0;

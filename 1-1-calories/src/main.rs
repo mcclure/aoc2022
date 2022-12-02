@@ -5,6 +5,7 @@ use std::fs::File;
 use either::Either;
 
 fn main() -> Result<(), Error> {
+	// Load file from command-line argument or (if none) stdin
 	let filename = std::env::args().fuse().nth(1);
 	let input: Either<BufReader<Stdin>, BufReader<File>> = match &filename {
 		None => either::Left(BufReader::new(stdin())),
@@ -16,6 +17,7 @@ fn main() -> Result<(), Error> {
 	let mut current = 0;
 	let mut best = 0;
 
+	// Scan file
 	loop {
 		let mut chunk_finished = || {
 			// println!("Chunk finished; {} > {}", current, best);
@@ -40,6 +42,7 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
+	// Final score
 	println!("{}", best);
 
 	Ok(())
