@@ -28,12 +28,12 @@ fn main() -> Result<(), Error> {
 		let mut left_set: HashSet<u8> = HashSet::with_capacity(26*2);
 		for (index,letter) in letters.iter().enumerate() {
 			let letter = *letter;
-			if index < len/2 {
+			if index < len/2 { // Left side
 				if !(letter as char).is_alphabetic() { return invalid() }
 				left_set.insert(letter);
-			} else {
-				if left_set.contains(&letter) {
-//					println!("Line {} collide: {}", index, letter);
+			} else { // Right side
+				if left_set.contains(&letter) { // Check for collision 
+					//println!("Collide: {}", letter as char);
 					let score;
 					if letter >= ('a' as u8) && letter <= ('z' as u8) {
 						score = letter-('a' as u8) + 1;
