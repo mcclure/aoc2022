@@ -32,15 +32,18 @@ fn main() -> Result<(), Error> {
 				if !(letter as char).is_alphabetic() { return invalid() }
 				left_set.insert(letter);
 			} else {
-				println!("Line {} collide: {}", index, letter);
 				if left_set.contains(&letter) {
+//					println!("Line {} collide: {}", index, letter);
+					let score;
 					if letter >= ('a' as u8) && letter <= ('z' as u8) {
-						total += ( letter-('a' as u8) + 1 ) as i64;
+						score = letter-('a' as u8) + 1;
 					} else if letter >= ('A' as u8) && letter <= ('Z' as u8) {
-						total += ( letter-('A' as u8) + 1 + 26 ) as i64;
+						score = letter-('A' as u8) + 1 + 26;
 					} else {
 						return invalid();
 					}
+					left_set.remove(&letter);
+					total += score as i64;
 				}
 			}
 		}
@@ -48,7 +51,6 @@ fn main() -> Result<(), Error> {
 
 	// Final score
 	println!("{}", total);
-
 
 	Ok(())
 }
