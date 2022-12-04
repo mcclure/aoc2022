@@ -1,6 +1,8 @@
 cargo.exe new 1-1-calories --name calories
 
-mkdir 1-1-calories/data
+cargo.exe add either
+
+mkdir data
 
 copy top three lines plus:  -> Result<(), Error>
 

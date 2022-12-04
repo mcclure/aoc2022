@@ -30,7 +30,7 @@ fn main() -> Result<(), Error> {
 			let letter = *letter;
 			if index < len/2 { // Left side
 				if !(letter as char).is_alphabetic() { return invalid() }
-				left_set.insert(letter);
+				left_set.insert(letter)
 			} else { // Right side
 				if left_set.contains(&letter) { // Check for collision 
 					//println!("Collide: {}", letter as char);
