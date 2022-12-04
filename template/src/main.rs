@@ -15,7 +15,7 @@ fn main() -> Result<(), Error> {
 
 	let mut total: i64 = 0;
 
-//	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
+//	let invalid = || { Err(Error::new(ErrorKind::InvalidInput, "Expecting otherwise")) };
 
 	// Scan file
 	for line in lines {
