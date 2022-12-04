@@ -1,4 +1,7 @@
-// Summary
+// Given a list of ranges, determine how many fully enclose each other.
+
+#![allow(unused_parens)]
+
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
@@ -27,14 +30,22 @@ fn main() -> Result<(), Error> {
 	fn range_pair<'a>() -> Parser<'a, char, ((i64, i64), (i64, i64))>
 		{ range() - sym(',') + range() }
 
-//	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
+	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting input with format [num]-[num],[num]-[num]")) };
 
 	// Scan file
 	for line in lines {
 		let line = line?;
 		let line_array:Vec<char> = line.chars().collect();
 		let content = range_pair().parse(&line_array);
-		println!("{:?}", content);
+		match content {
+			Ok(_t @ ((a,b),(c,d))) => {
+				if b<a || d<c { return invalid() }
+				let pass = a<=c && b>=d || c<=a && d>=b;
+				//println!("{:?} {}", _t, pass);
+				if pass { total += 1 }
+			},
+			_ => return invalid()
+		}
 	}
 
 	// Final score
