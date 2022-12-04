@@ -4,8 +4,6 @@ use std::fs::File;
 use either::Either;
 
 use pom::parser::*;
-use std::str;
-use std::str::FromStr;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
