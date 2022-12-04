@@ -4,7 +4,6 @@ use std::fs::File;
 use either::Either;
 
 use pom::parser::*;
-use pom::Parser;
 use std::str;
 use std::str::FromStr;
 
@@ -21,19 +20,22 @@ fn main() -> Result<(), Error> {
 	let mut total: i64 = 0;
 
 	// p for positive
-	fn pinteger() -> Parser<u8, i64> {
+	fn pinteger<'a>() -> Parser<'a, char, i64> {
 		let integer = one_of("123456789") - one_of("0123456789").repeat(0..) | sym('0');
-		integer.collect().convert(str::from_utf8).convert(|s|i64::from_str(&s))
+		integer.collect().convert(|s|String::from_iter(s.iter()).parse::<i64>())
 	}
-	let range = pinteger() - sym(b'-') + pinteger();
-	let range_pair = range - sym(b',') + range;
+	fn range<'a>() -> Parser<'a, char, (i64, i64)>
+		{ pinteger() - sym('-') + pinteger() }
+	fn range_pair<'a>() -> Parser<'a, char, ((i64, i64), (i64, i64))>
+		{ range() - sym(',') + range() }
 
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
 	// Scan file
 	for line in lines {
 		let line = line?;
-		let content = range_pair.parse(br#"Test"#);
+		let line_array:Vec<char> = line.chars().collect();
+		let content = range_pair().parse(&line_array);
 		println!("{:?}", content);
 	}
 
