@@ -1,8 +1,17 @@
-// Summary
+// Simulate a crane robot based on a drawing and a series of instructions.
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
+
+use regex::Regex;
+
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum Tok {
+    Blank,
+    Crate,
+}
+
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -18,9 +27,16 @@ fn main() -> Result<(), Error> {
 
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
+	// Series of either three spaces or [W], separated by spaces. Will capture W or S (for Word or Space)
+	let crateLine = Regex::new(r"(?:(?:^|\s)(?:\[(?P<W>\w)\]|\s{3}))+").unwrap();
+
 	// Scan file
 	for line in lines {
 		let line = line?;
+		println!("Line");
+		for capture in crateLine.captures_iter(&line) {
+			println!("{:?} {:?} {} {:?}", capture.name("W"), capture.get(0), capture.len(), capture.get(1));
+		}
 	}
 
 	// Final score

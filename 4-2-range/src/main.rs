@@ -1,4 +1,4 @@
-// Given a list of ranges, determine how many fully enclose each other.
+// Given a list of ranges, determine how many overlap each other.
 
 #![allow(unused_parens)]
 
