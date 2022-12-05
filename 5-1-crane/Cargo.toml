@@ -8,4 +8,3 @@ edition = "2021"
 [dependencies]
 either = "1.8.0"
 regex = "1.7.0"
-regex-lexer = "0.2.0"

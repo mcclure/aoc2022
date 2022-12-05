@@ -6,13 +6,6 @@ use either::Either;
 
 use regex::Regex;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Tok {
-    Blank,
-    Crate,
-}
-
-
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
 	let filename = std::env::args().fuse().nth(1);
@@ -28,14 +21,26 @@ fn main() -> Result<(), Error> {
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
 	// Series of either three spaces or [W], separated by spaces. Will capture W or S (for Word or Space)
-	let crateLine = Regex::new(r"(?:(?:^|\s)(?:\[(?P<W>\w)\]|\s{3}))+").unwrap();
+	let separator_re = Regex::new(r"^\p{gc:Zs}").unwrap();
+	let blank_re = Regex::new(r"^\p{gc:Zs}{3}").unwrap();
+	let crate_re = Regex::new(r"^\[(\w)\]").unwrap();
+
+	fn match_next<'a>(s:&'a str, m:regex::Captures) -> &'a str {
+		return &s[m.get(0).unwrap().end()..]
+	}
+
+	fn match_next_get<'a, 'b>(s:&'a str, m:regex::Captures<'b>) -> (&'a str, &'b str) {
+		return (&s[m.get(0).unwrap().end()..], m.get(1).unwrap().as_str())
+	}
 
 	// Scan file
 	for line in lines {
 		let line = line?;
+		let rest = line.as_str();
 		println!("Line");
-		for capture in crateLine.captures_iter(&line) {
-			println!("{:?} {:?} {} {:?}", capture.name("W"), capture.get(0), capture.len(), capture.get(1));
+		if let Some(capture) = crate_re.captures(rest) {
+			let (a,b) = match_next_get(rest, capture);
+			println!("{} | {}", b,a);
 		}
 	}
 
