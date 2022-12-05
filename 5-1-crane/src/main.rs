@@ -25,12 +25,14 @@ fn main() -> Result<(), Error> {
 	let blank_re = Regex::new(r"^\p{gc:Zs}{3}").unwrap();
 	let crate_re = Regex::new(r"^\[(\w)\]").unwrap();
 
-	fn match_next<'a>(s:&'a str, m:regex::Captures) -> &'a str {
+	// Returns rest of string after match
+	fn match_next<'a>(m:regex::Captures, s:&'a str) -> &'a str {
 		return &s[m.get(0).unwrap().end()..]
 	}
 
-	fn match_next_get<'a, 'b>(s:&'a str, m:regex::Captures<'b>) -> (&'a str, &'b str) {
-		return (&s[m.get(0).unwrap().end()..], m.get(1).unwrap().as_str())
+	// Returns rest of string after match, first match group
+	fn match_next_get<'a, 'b>(m:regex::Captures<'a>, s:&'b str) -> (&'a str, &'b str) {
+		return (m.get(1).unwrap().as_str(), match_next(m, s))
 	}
 
 	// Scan file
@@ -39,7 +41,7 @@ fn main() -> Result<(), Error> {
 		let rest = line.as_str();
 		println!("Line");
 		if let Some(capture) = crate_re.captures(rest) {
-			let (a,b) = match_next_get(rest, capture);
+			let (a,b) = match_next_get(capture, rest);
 			println!("{} | {}", b,a);
 		}
 	}
