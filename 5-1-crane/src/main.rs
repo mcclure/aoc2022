@@ -14,17 +14,19 @@ fn main() -> Result<(), Error> {
 		Some(x) => either::Right(BufReader::new(std::fs::File::open(x)?))
 	};
 
-	let lines = input.lines();
+	let mut lines = input.lines();
 
 	let mut total: i64 = 0;
 
-//	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
+	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Did not find expected ascii art diagram")) };
+	let invalid2 = || { return Err(Error::new(ErrorKind::InvalidInput, "Expected sentence like 'move x from y to z'")) };
 
 	// Series of either three spaces or [W], separated by spaces. Will capture W or S (for Word or Space)
 	let separator_re = Regex::new(r"^\p{gc:Zs}").unwrap();
 	let blank_re = Regex::new(r"^\p{gc:Zs}{3}").unwrap();
 	let crate_re = Regex::new(r"^\[(\w)\]").unwrap();
 	let numbers_re = Regex::new(r"^[\s\d]+$").unwrap();
+	let move_re = Regex::new(r"^move (\d+) from (\d+) to (\d+)$").unwrap();
 
 	// Returns rest of string after match
 	fn match_next<'a>(m:regex::Captures, s:&'a str) -> &'a str {
@@ -36,8 +38,10 @@ fn main() -> Result<(), Error> {
 		return (m.get(1).unwrap().as_str(), match_next(m, s))
 	}
 
+	let mut data:Vec<Vec<char>> = Vec::new();
+
 	// Scan file
-	for line in lines {
+	for line in lines.by_ref() {
 		let line = line?;
 		let mut rest = line.as_str();
 		println!("Line");
@@ -49,6 +53,7 @@ fn main() -> Result<(), Error> {
 
 		let mut column = 0;
 		loop {
+			// Blank space before crate
 			if column > 0 {
 				if let Some(capture) = separator_re.captures(rest) {
 					rest = match_next(capture, rest)
@@ -56,19 +61,49 @@ fn main() -> Result<(), Error> {
 					break // End of string
 				}
 			}
+			// No crate
 			if let Some(capture) = blank_re.captures(rest) {
 				rest = match_next(capture, rest);
+			// Crate
 			} else if let Some(capture) = crate_re.captures(rest) {
 				let tag:&str;
 				(tag, rest) = match_next_get(capture, rest);
-				println!("Column {} tag {}", column, tag);
+				while data.len() <= column
+					{ data.push(Vec::new()) }
+				let tag_ch = tag.chars().next().unwrap();
+				data[column].push(tag_ch);
+				println!("Column {} tag {}", column, tag_ch);
+			} else {
+				return invalid();
 			}
 			column += 1
 		}
 	}
 
+	if data.len() == 0 { return invalid() }
+
+	// Reverse all columns of data
+	// Note column not of same type as before
+	for column in data.iter_mut() {
+		column.reverse()
+	}
+
+	for line in lines {
+		let line = line?;
+		if let Some(capture) = move_re.captures(&line) {
+			let v = capture.iter().skip(1)
+				.map(|x| match x { None => "NONE", Some(x) => x.as_str() })
+				.collect::<Vec<&str>>();
+			let [a,b,c] = <[&str; 3]>::try_from(v).ok().unwrap();
+
+			println!("{}: {}, {}, {}", line, a, b, c);
+		} else {
+			return invalid2()
+		}
+	}
+
 	// Final score
-	println!("{}", total);
+	println!("{:?}", data);
 
 	Ok(())
 }
