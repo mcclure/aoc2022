@@ -16,10 +16,10 @@ fn main() -> Result<(), Error> {
 
 	let mut lines = input.lines();
 
-	let mut total: i64 = 0;
-
-	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Did not find expected ascii art diagram")) };
-	let invalid2 = || { return Err(Error::new(ErrorKind::InvalidInput, "Expected sentence like 'move x from y to z'")) };
+	let invalid =   || { Err(Error::new(ErrorKind::InvalidInput, "Did not find expected ascii art diagram")) };
+	let invalide2 = || { Error::new(ErrorKind::InvalidInput, "Expected sentence like 'move x from y to z'") };
+	let invalid2 =  || { Err(invalide2()) };
+	let invalide3 = || { Error::new(ErrorKind::InvalidInput, "Out of crates") };
 
 	// Series of either three spaces or [W], separated by spaces. Will capture W or S (for Word or Space)
 	let separator_re = Regex::new(r"^\p{gc:Zs}").unwrap();
@@ -36,6 +36,14 @@ fn main() -> Result<(), Error> {
 	// Returns first match group, rest of string after match
 	fn match_next_get<'a, 'b>(m:regex::Captures<'a>, s:&'b str) -> (&'a str, &'b str) {
 		return (m.get(1).unwrap().as_str(), match_next(m, s))
+	}
+
+	fn index_two<T>(a:& mut[T], b:usize, c:usize) -> (&mut T, &mut T) {
+		let ordered = b < c;
+		let (low_idx, high_idx) = if ordered { (b,c) } else { (c,b) };
+		let (low_slice, high_slice) = a.split_at_mut(high_idx);
+		let (low, high) = (&mut low_slice[low_idx], &mut high_slice[0]);
+		return if ordered { (low, high) } else { (high, low) }
 	}
 
 	let mut data:Vec<Vec<char>> = Vec::new();
@@ -90,20 +98,43 @@ fn main() -> Result<(), Error> {
 
 	for line in lines {
 		let line = line?;
+		println!("Command: {} On: {:?}", line, data);
+
 		if let Some(capture) = move_re.captures(&line) {
 			let v = capture.iter().skip(1)
-				.map(|x| match x { None => "NONE", Some(x) => x.as_str() })
-				.collect::<Vec<&str>>();
-			let [a,b,c] = <[&str; 3]>::try_from(v).ok().unwrap();
+				.map(|x| match x {
+					None => Err(invalide2()),
+					Some(x) => x.as_str().parse::<usize>().map_err(|_|invalide2())
+				}).collect::<Result<Vec<usize>, Error>>()?;
 
-			println!("{}: {}, {}, {}", line, a, b, c);
+			let [a,b,c] = <[usize; 3]>::try_from(v).ok().unwrap();
+
+			if b == 0 || c == 0 { return invalid2() }
+			if b != c {
+				let (column_from, column_to) = index_two(&mut data, b-1, c-1);
+
+				// This is wrong, but isn't it nice?! // Update: This turns out to be the 5-2 puzzle actually
+				//let column_from_n = column_from.len();
+				//let column_from_post_n = column_from_n-a;
+				// column_to.extend_from_slice(&column_from[column_from_post_n..column_from_n]);
+				// column_from.truncate(column_from_post_n);
+				for _ in 0..a {
+					column_to.push(column_from.pop().ok_or_else(invalide3)?)
+				}
+			}
 		} else {
 			return invalid2()
 		}
 	}
 
-	// Final score
-	println!("{:?}", data);
+	// Debug, print entire tree
+	println!("Final: {:?}", data);
+
+	// Result code
+	for column in data {
+		print!("{}", column.last().unwrap_or(&' '));
+	}
+	println!("");
 
 	Ok(())
 }
