@@ -24,13 +24,14 @@ fn main() -> Result<(), Error> {
 	let separator_re = Regex::new(r"^\p{gc:Zs}").unwrap();
 	let blank_re = Regex::new(r"^\p{gc:Zs}{3}").unwrap();
 	let crate_re = Regex::new(r"^\[(\w)\]").unwrap();
+	let numbers_re = Regex::new(r"^[\s\d]+$").unwrap();
 
 	// Returns rest of string after match
 	fn match_next<'a>(m:regex::Captures, s:&'a str) -> &'a str {
 		return &s[m.get(0).unwrap().end()..]
 	}
 
-	// Returns rest of string after match, first match group
+	// Returns first match group, rest of string after match
 	fn match_next_get<'a, 'b>(m:regex::Captures<'a>, s:&'b str) -> (&'a str, &'b str) {
 		return (m.get(1).unwrap().as_str(), match_next(m, s))
 	}
@@ -38,11 +39,31 @@ fn main() -> Result<(), Error> {
 	// Scan file
 	for line in lines {
 		let line = line?;
-		let rest = line.as_str();
+		let mut rest = line.as_str();
 		println!("Line");
-		if let Some(capture) = crate_re.captures(rest) {
-			let (a,b) = match_next_get(capture, rest);
-			println!("{} | {}", b,a);
+
+		// Note: Moves to phase 2 on first empty line, ignores number "comment"
+		// Does NOT check accuracy of number "comment"
+		if rest.is_empty() { break }
+		if let Some(_) = numbers_re.captures(rest) { continue }
+
+		let mut column = 0;
+		loop {
+			if column > 0 {
+				if let Some(capture) = separator_re.captures(rest) {
+					rest = match_next(capture, rest)
+				} else {
+					break // End of string
+				}
+			}
+			if let Some(capture) = blank_re.captures(rest) {
+				rest = match_next(capture, rest);
+			} else if let Some(capture) = crate_re.captures(rest) {
+				let tag:&str;
+				(tag, rest) = match_next_get(capture, rest);
+				println!("Column {} tag {}", column, tag);
+			}
+			column += 1
 		}
 	}
 
