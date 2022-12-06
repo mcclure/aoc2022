@@ -38,7 +38,6 @@ fn main() -> Result<(), Error> {
 		return (m.get(1).unwrap().as_str(), match_next(m, s))
 	}
 
-	// Assumes b != c
 	fn index_two<T>(a:& mut[T], b:usize, c:usize) -> (&mut T, &mut T) {
 		let ordered = b < c;
 		let (low_idx, high_idx) = if ordered { (b,c) } else { (c,b) };
@@ -114,14 +113,10 @@ fn main() -> Result<(), Error> {
 			if b != c {
 				let (column_from, column_to) = index_two(&mut data, b-1, c-1);
 
-				// This is wrong, but isn't it nice?! // Update: This turns out to be the 5-2 puzzle actually
-				//let column_from_n = column_from.len();
-				//let column_from_post_n = column_from_n-a;
-				// column_to.extend_from_slice(&column_from[column_from_post_n..column_from_n]);
-				// column_from.truncate(column_from_post_n);
-				for _ in 0..a {
-					column_to.push(column_from.pop().ok_or_else(invalide3)?)
-				}
+				let column_from_n = column_from.len();
+				let column_from_post_n = column_from_n-a;
+				column_to.extend_from_slice(&column_from[column_from_post_n..column_from_n]);
+				column_from.truncate(column_from_post_n);
 			}
 		} else {
 			return invalid2()
