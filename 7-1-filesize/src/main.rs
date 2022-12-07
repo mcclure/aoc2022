@@ -9,27 +9,29 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use std::collections::HashMap;
 use either::Either;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 const BADSIZE:u64 = 100_000;
 
 #[derive(Default)]
 struct Dir {
-	dir:HashMap<String, Dir>,
+	dir:HashMap<String, Rc<RefCell<Dir>>>,
 	size:u64
 }
 
 fn print_tree(d:&Dir, depth:usize) {
 	for (k,v) in &d.dir {
 		for _ in 0..depth { print!("\t") }
-		println!("{}: {}", k, v.size);
-		print_tree(d, depth+1);
+		println!("{}: {}", k, v.borrow().size);
+		print_tree(&v.borrow(), depth+1);
 	}
 }
 
 fn total_filesize(d:&Dir) -> u64 {
 	let mut total = d.size;
 	for d2 in d.dir.values() {
-		total += total_filesize(d2)
+		total += total_filesize(&d2.borrow())
 	}
 	return total
 }
@@ -44,14 +46,14 @@ fn main() -> Result<(), Error> {
 
 	let lines = input.lines();
 
-	let mut root:Dir = Default::default();
+	let root:Rc<RefCell<Dir>> = Default::default();
 
 	// Line parser
 	{
 		use pom::parser::*;
 
-		let mut pwd:Vec<&mut Dir> = Vec::new();
-		pwd.push(&mut root);
+		let mut pwd:Vec<Rc<RefCell<Dir>>> = Vec::new();
+		pwd.push(root.clone());
 
 		let invalid = |s:String| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: '{}'", s))) };
 
@@ -93,8 +95,10 @@ fn main() -> Result<(), Error> {
 			pattern.map(|x| Parsed::Size(x))
 		}
 		fn cli_cd<'a>() -> Parser<'a, char, Parsed> {
-			let pattern = cli_prefix() - seq(&['c', 'd']) - whitespace() * none_of(" \t").repeat(1..);
-			pattern.collect().map(|x| Parsed::Cd(x.iter().collect()))
+			let prefix = cli_prefix() - seq(&['c', 'd']) - whitespace();
+			let pattern = none_of(" \t").repeat(1..)
+				.map(|x| Parsed::Cd(x.iter().collect()));
+			prefix * pattern
 		}
 		fn cli_line<'a>() -> Parser<'a, char, Parsed>
 			{ cli_ls() | cli_dir() | cli_size() | cli_cd() }
@@ -105,28 +109,32 @@ fn main() -> Result<(), Error> {
 			let line_array:Vec<char> = splode(&line);
 			let content = cli_line().parse(&line_array);
 			match content {
-				Ok(Parsed::Ls) => pwd.last_mut().unwrap().size = 0,
+				Ok(Parsed::Ls) => pwd.last().unwrap().borrow_mut().size = 0,
 				Ok(Parsed::Dir) => (),
 				Ok(Parsed::Cd(s)) => {
 					match s.as_str() {
 						"/" => pwd.truncate(1),
 						".." => if pwd.len() > 1 { pwd.pop(); },
-						_ => pwd.push( &mut pwd.last_mut().unwrap().dir[&s] )
-					}
+						_ => {
+							let d = pwd.last().unwrap().borrow_mut()
+								.dir.entry(s).or_default().clone();
+							pwd.push( d )
+						}
+					};
 				},
-				Ok(Parsed::Size(s)) => pwd.last_mut().unwrap().size += s,
+				Ok(Parsed::Size(s)) => pwd.last().unwrap().borrow_mut().size += s,
 				_ => return invalid(line)
 			}
 		}
 	}
 
-	print_tree(&root, 0);
+	print_tree(&root.borrow(), 0);
 
 	let mut total: u64 = 0;
 
-	for v in root.dir.values() {
-		let size = total_filesize(v);
-		if size > BADSIZE { total += size }
+	for v in root.borrow().dir.values() {
+		let size = total_filesize(&v.borrow());
+		if size <= BADSIZE { total += size }
 	}
 
 	// Final score
