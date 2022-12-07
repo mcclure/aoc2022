@@ -28,12 +28,22 @@ fn print_tree(d:&Dir, depth:usize) {
 	}
 }
 
-fn total_filesize(d:&Dir) -> u64 {
+fn _total_filesize(d:&Dir) -> u64 {
 	let mut total = d.size;
 	for d2 in d.dir.values() {
-		total += total_filesize(&d2.borrow())
+		total += _total_filesize(&d2.borrow())
 	}
 	return total
+}
+
+fn delete_candidate_filesize(d:&Dir) -> (u64, u64) {
+	let (mut total, mut result) = (d.size,0);
+	for d2 in d.dir.values() {
+		let (subtotal, subresult) = delete_candidate_filesize(&d2.borrow());
+		total += subtotal;
+		result += subresult;
+	}
+	(total, if total<=BADSIZE { total } else { result })
 }
 
 fn main() -> Result<(), Error> {
@@ -130,15 +140,10 @@ fn main() -> Result<(), Error> {
 
 	print_tree(&root.borrow(), 0);
 
-	let mut total: u64 = 0;
-
-	for v in root.borrow().dir.values() {
-		let size = total_filesize(&v.borrow());
-		if size <= BADSIZE { total += size }
+	{ // Final score
+		let (_, size) = delete_candidate_filesize(&root.borrow());
+		println!("{}", size);
 	}
-
-	// Final score
-	println!("{}", total);
 
 	Ok(())
 }
