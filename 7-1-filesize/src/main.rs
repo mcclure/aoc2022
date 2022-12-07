@@ -53,7 +53,7 @@ fn main() -> Result<(), Error> {
 		let mut pwd:Vec<&mut Dir> = Vec::new();
 		pwd.push(&mut root);
 
-		let invalid = |s:String| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: \"{}\"", s))) };
+		let invalid = |s:String| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: '{}'", s))) };
 
 		enum Parsed {
 			Ls,         // Reset
@@ -105,10 +105,16 @@ fn main() -> Result<(), Error> {
 			let line_array:Vec<char> = splode(&line);
 			let content = cli_line().parse(&line_array);
 			match content {
-				Ok(Parsed::Ls) => (),
+				Ok(Parsed::Ls) => pwd.last_mut().unwrap().size = 0,
 				Ok(Parsed::Dir) => (),
-				Ok(Parsed::Cd(_)) => (),
-				Ok(Parsed::Size(_)) => (),
+				Ok(Parsed::Cd(s)) => {
+					match s.as_str() {
+						"/" => pwd.truncate(1),
+						".." => if pwd.len() > 1 { pwd.pop(); },
+						_ => pwd.push( &mut pwd.last_mut().unwrap().dir[&s] )
+					}
+				},
+				Ok(Parsed::Size(s)) => pwd.last_mut().unwrap().size += s,
 				_ => return invalid(line)
 			}
 		}
