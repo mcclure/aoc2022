@@ -4,18 +4,27 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
 
+#[derive(Default)]
 struct Dir {
-	dir:Vec<Dir>,
+	dir:HashMap<Dir>,
 	size:i64
 }
 
-impl Default for Dir {
-    fn default() -> Dir {
-        Dir {
-            dir: Vec::new(),
-            size:0
-        }
-    }
+fn print_tree(d:Dir, depth:usize) {
+	for 0..depth { print!("\t") }
+	println!()
+	for d2 in d.dir {
+		total += total_filesize(d2)
+	}
+	return total
+}
+
+fn total_filesize(d:Dir) {
+	let mut total = d.size;
+	for d2 in d.dir {
+		total += total_filesize(d2)
+	}
+	return total
 }
 
 fn main() -> Result<(), Error> {
@@ -28,7 +37,7 @@ fn main() -> Result<(), Error> {
 
 	let lines = input.lines();
 
-	let mut dir:Dir = Default::default();
+	let mut root:Dir = Default::default();
 
 	// Scan file
 	for line in lines {
