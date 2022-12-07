@@ -43,7 +43,7 @@ fn delete_candidate_filesize(d:&Dir) -> (u64, u64) {
 		total += subtotal;
 		result += subresult;
 	}
-	(total, if total<=BADSIZE { total } else { result })
+	(total, result + if total<=BADSIZE { total } else { 0 })
 }
 
 fn main() -> Result<(), Error> {
