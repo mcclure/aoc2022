@@ -60,28 +60,35 @@ fn main() -> Result<(), Error> {
 	let invisible = {
 		let height = grid.len();
 		let mut seen:usize = 0;
-		let mut check = |x:usize,y:usize,highest:&mut i8| {
+		let mut check = |x:usize,y:usize,idx:usize,highest:&mut i8,pass_seen:&mut Vec<bool>| {
+			let pass_seen_cell:&mut bool = &mut pass_seen[idx];
+			if *pass_seen_cell { return true } // Met ourselves from other side, don't process further.
+
 			let seen_cell:&mut bool = &mut seen_grid[x][y];
-			if *seen_cell { return true }
 			let grid_cell = grid[x][y];
 			if grid_cell > *highest {
 				*highest = grid_cell;
-				*seen_cell = true;
-				seen += 1;
+				*pass_seen_cell = true;
+				if !*seen_cell {
+					*seen_cell = true;
+					seen += 1;
+				}
 			}
 			false
 		};
 		for x in 0..width {
+			let mut pass_seen = vec![false; width];
 			let mut highest:i8 = -1;
-			for y in 0..height { if check(x,y,&mut highest) { break } }
+			for y in 0..height { if check(x,y,y,&mut highest,&mut pass_seen) { break } }
 			let mut highest:i8 = -1;
-			for y in (0..height).rev() { if check(x,y,&mut highest) { break } }
+			for y in (0..height).rev() { if check(x,y,y,&mut highest,&mut pass_seen) { break } }
 		}
-		for y in 0..grid.len() {
+		for y in 0..height {
+			let mut pass_seen = vec![false; height];
 			let mut highest:i8 = -1;
-			for x in 0..width { if check(x,y,&mut highest) { break } }
+			for x in 0..width { if check(x,y,x,&mut highest,&mut pass_seen) { break } }
 			let mut highest:i8 = -1;
-			for x in (0..width).rev() { if check(x,y,&mut highest) { break } }
+			for x in (0..width).rev() { if check(x,y,x,&mut highest,&mut pass_seen) { break } }
 		}
 		seen
 	};
