@@ -1,4 +1,4 @@
-// Finds "invisible" cells in a height map
+// Counts number of spaces visible from other spaces in a height map
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
@@ -15,7 +15,6 @@ fn main() -> Result<(), Error> {
 	let lines = input.lines();
 
 	let mut grid: Vec<Vec<i8>> = Default::default();
-	let mut seen_grid: Vec<Vec<bool>>;
 
 	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Blank lines?")) };
 	let invalide2 = || { return Error::new(ErrorKind::InvalidInput, "Invalid characters") };
@@ -48,100 +47,65 @@ fn main() -> Result<(), Error> {
 
 		match width {
 			None => return invalid4(),
-			Some(width) => {
-				seen_grid = vec![vec![false; width]; grid.len()];
-				width
-			}
+			Some(width) => { width }
 		}
 	};
+
+	//for y in &grid { for x in y { print!("{}", *x) } println!(""); }
 
 	// Check visibility.
 	// Note 0 does NOT mean "no tree". It means a min-height tree.
 	let height = grid.len();
-	{
-		let mut check = |x:usize,y:usize,idx:usize,highest:&mut i8,pass_seen:&mut Vec<bool>| {
-			let pass_seen_cell:&mut bool = &mut pass_seen[idx];
-			if *pass_seen_cell { return true } // Met ourselves from other side, don't process further.
-
-			let seen_cell:&mut bool = &mut seen_grid[x][y];
-			let grid_cell = grid[x][y];
-			if grid_cell > *highest {
-				*highest = grid_cell;
-				*pass_seen_cell = true;
-				if !*seen_cell {
-					*seen_cell = true;
-				}
-			}
-			false
-		};
-		for x in 0..width {
-			let mut pass_seen = vec![false; width];
-			let mut highest:i8 = -1;
-			for y in 0..height { if check(x,y,y,&mut highest,&mut pass_seen) { break } }
-			let mut highest:i8 = -1;
-			for y in (0..height).rev() { if check(x,y,y,&mut highest,&mut pass_seen) { break } }
-		}
-		for y in 0..height {
-			let mut pass_seen = vec![false; height];
-			let mut highest:i8 = -1;
-			for x in 0..width { if check(x,y,x,&mut highest,&mut pass_seen) { break } }
-			let mut highest:i8 = -1;
-			for x in (0..width).rev() { if check(x,y,x,&mut highest,&mut pass_seen) { break } }
-		}
-	};
-
-	// This is sideways :/
-	for y in &seen_grid { for x in y { print!("{}", if *x {'█'} else {'.'}) } println!(""); }
 
 	let mut best = 0;
 
-	for (x, col) in seen_grid.iter().enumerate() {
-		for (y, skip) in col.iter().enumerate() {
-			if *skip { continue }
-			let ceiling = grid[x][y];
+	for (y, col) in grid.iter().enumerate() {
+		for (x, ceiling) in col.iter().enumerate() {
 			let mut score = 1;
+			let ceiling = *ceiling;
 
 			let check = |x2:usize,y2:usize,highest:&mut i8,count:&mut usize| {
-				let against = grid[x2][y2];
-				if against > *highest { 
+				let against = grid[y2][x2];
+				if against > *highest {
 					*count += 1;
+					//println!("\t\t{}, {}: Against {} ceiling {}", x2, y2, against, ceiling);
 					if against >= ceiling { return true }
 				}
 				return false 
 			};
 
-			println!("Position {}, {}", x, y);
+			//println!("Position {}, {}", x, y);
 
 			score *= {
 				let mut highest = -1;
 				let mut count:usize = 0; // Don't have to worry about edges because these are never viable
 				for y2 in (y+1)..height { if check(x,y2,&mut highest,&mut count) { break } }
-				println!("\tDown: {}", count);
+				//println!("\tDown: {}", count);
 				count
 			};
 			score *= {
 				let mut highest = -1;
 				let mut count:usize = 0;
 				for y2 in (0..y).rev() { if check(x,y2,&mut highest,&mut count) { break } }
-				println!("\tUp: {}", count);
+				//println!("\tUp: {}", count);
 				count
 			};
 			score *= {
 				let mut highest = -1;
 				let mut count:usize = 0;
 				for x2 in (x+1)..width { if check(x2,y,&mut highest,&mut count) { break } }
-				println!("\tRight: {}", count);
+				//println!("\tRight: {}", count);
 				count
 			};
 			score *= {
 				let mut highest = -1;
 				let mut count:usize = 0;
 				for x2 in (0..x).rev() { if check(x2,y,&mut highest,&mut count) { break } }
-				println!("\tLeft: {}", count);
+				//println!("\tLeft: {}", count);
 				count
 			};
 
-			println!("\tScore: {}{}", score, if score>best {" (new best)"} else {""});
+			//println!("\tScore: {}{}", score, if score>best {" (new best)"} else {""});
 
 			if score>best { best = score }
 		}
