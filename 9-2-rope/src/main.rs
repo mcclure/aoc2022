@@ -9,8 +9,8 @@ use itertools::Itertools;
 use std::cmp::{min, max};
 use ndarray::{Axis, Array2};
 
-const DEBUG:bool = true;
-const ROPE_LEN:usize = 9;
+const DEBUG:bool = false;
+const ROPE_LEN:usize = 10;
 
 // "Debug line", "debug single"
 macro_rules! d { ( $( $x:expr ),* ) => { if (DEBUG) { println!($($x,)*) } }; }
@@ -69,7 +69,7 @@ fn main() -> Result<(), Error> {
 			for _ in 0..count {
 				rope[0] = point_add(rope[0], dir);
 				map_write(rope[0], Cell::Headed);
-
+d!("\t\t---");
 				for idx in 0..(ROPE_LEN-1) {
 					let (rope_left, rope_right) = rope.split_at_mut(idx+1);
 					let (head_at, tail_at) = (&rope_left[idx], &mut rope_right[0]);
@@ -77,13 +77,18 @@ fn main() -> Result<(), Error> {
 					let (xda, yda) = (xd.abs(), yd.abs());
 					let offset:At;
 					if xda>1 || yda>1 {
-						if xda>yda {
-							offset = (if xd>0 {-1} else {1},0)
-						} else {
-							offset = (0,if yd>0 {-1} else {1})
+						fn dir(i:i32) -> i32 {
+							if i < -1 { return 1 }
+							if i > 1  { return -1 }
+							return 0
 						}
+						offset = (dir(xd),dir(yd));
+						d!("head {:?} tail {:?} diff {},{} offset {:?}", *head_at, *tail_at, xd, yd, offset);
 						*tail_at = point_add(*head_at, offset);
+						d!("\ttail now: {:?}", *tail_at);
 						map_write(*tail_at, if idx < ROPE_LEN-2 {Cell::Roped} else {Cell::Tailed} );
+					} else {
+						d!("head {:?} tail {:?} diff {},{}", *head_at, *tail_at, xd, yd);
 					}
 				}
 			}
