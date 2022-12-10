@@ -4,6 +4,8 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
 
+const EVERY_CYCLE:bool = false;
+
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
 	let filename = std::env::args().fuse().nth(1);
@@ -21,13 +23,13 @@ fn main() -> Result<(), Error> {
 
 	let mut reg: i64 = 1;
 	let mut cycle:i64 = 0;
-	let mut advance = |x| {
+	let mut advance = |x, reg:&i64| {
 		let mut x = x;
 		while x>0 {
 			x -= 1;
 			cycle += 1;
-			if (cycle>20 && (cycle-20)%40 == 0) || cycle==20 {
-				let score = cycle*reg;
+			if EVERY_CYCLE || (cycle>20 && (cycle-20)%40 == 0) || cycle==20 {
+				let score = cycle * *reg;
 				println!("Cycle {} Register {} score {}", cycle, reg, score);
 				total += score;
 			}
@@ -41,10 +43,10 @@ fn main() -> Result<(), Error> {
 		let mut tokens = line.split_whitespace().fuse();
 		let keyword = tokens.next().unwrap();
 		match keyword {
-			"noop" => { advance(1); }
+			"noop" => { advance(1,&reg); }
 			"addx" => {
 				let x = tokens.next().ok_or_else(invalide)?.parse::<i64>().map_err(|_|invalide())?;
-				advance(3);
+				advance(2,&reg);
 				reg += x;
 			}
 			_ => {
