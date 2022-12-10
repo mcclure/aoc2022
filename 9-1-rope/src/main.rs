@@ -7,6 +7,7 @@ use hashbrown::HashMap;
 use hashbrown::hash_map::Entry;
 use itertools::Itertools;
 use std::cmp::{min, max};
+use ndarray::{Axis, Array2};
 
 const DEBUG:bool = false;
 
@@ -24,6 +25,7 @@ fn point_add((x,y):At, (x2,y2):At) -> At { (x+x2,y+y2) }
 fn point_sub((x,y):At, (x2,y2):At) -> At { (x-x2,y-y2) }
 fn point_min((x,y):At, (x2,y2):At) -> At { (min(x,x2),min(y,y2)) }
 fn point_max((x,y):At, (x2,y2):At) -> At { (max(x,x2),max(y,y2)) }
+fn point_usize((x,y):At) -> (usize, usize) { (x as usize, y as usize) }
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -52,6 +54,7 @@ fn main() -> Result<(), Error> {
 	// Scan file
 	{
 		let mut head_at = (0,0);
+		let mut tail_at = (0,0);
 		map_write(head_at, Cell::Start);
 		for line in lines {
 			let line = line?;
@@ -65,30 +68,43 @@ fn main() -> Result<(), Error> {
 			for _ in 0..count {
 				head_at = point_add(head_at, dir);
 				map_write(head_at, Cell::Headed);
+
+				let ((x,y),(x2,y2)) = (head_at, tail_at);
+				     if x-x2 > 1  { tail_at = (x-1, y) }
+				else if x-x2 < -1 { tail_at = (x+1, y) }
+				else if y-y2 > 1  { tail_at = (x, y-1) }
+				else if y-y2 < -1  { tail_at = (x, y+1) }
+				map_write(tail_at, Cell::Tailed);
 			}
 		}
 	}
 
 	if DEBUG {
-		let (mut min, mut max) = ((i32::MIN, i32::MIN), (i32::MAX, i32::MAX));
+		let (mut min, mut max) = ((i32::MAX, i32::MAX), (i32::MIN, i32::MIN));
 		for k in map.keys() {
 			min = point_min(min, *k);
-			max = point_max(min, *k);
+			max = point_max(max, *k);
 		}
-		let (xs, ys) = point_sub(max,min);
-		let mut grid = [[Cell::Empty; ys]; xs];
-		for (k,v) in map {
-			let (x,y) = point_min(k, min);
-			grid[y][x] = v;
+		let (xs, ys) = point_add(point_sub(max,min), (1,1));
+		let mut grid:Array2<Cell> = Array2::default((xs as usize, ys as usize)); //[[Cell::Empty; ys]; xs];
+		for (k,v) in &map {
+			let (k,v) = (*k, *v);
+			grid[point_usize(point_sub(k, min))] = v;
 		}
-		for col in grid {
+		for col in grid.axis_iter(Axis(1)) {
 			for v in col {
 				ds!("{}", match v {
-					Empty => '.', Headed => '_', Cell => '#', Start => 'S'
+					Cell::Empty => '.', Cell::Headed => '□', Cell::Tailed => '◊', Cell::Start => 'S'
 				})
 			}
 			d!("");
 		}
+		d!("");
+	}
+
+	for v in map.values() {
+		let v = *v;
+		if v == Cell::Tailed || v == Cell::Start { total += 1 }
 	}
 
 	// Final score
