@@ -152,7 +152,6 @@ fn main() -> Result<(), Error> {
 						Operand::Old => monkey.holding[inspect_idx],
 						Operand::Literal(n) => *n
 					};
-					println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // REMOVE ME
 					match op {
 						Op::Plus  => { monkey.holding[inspect_idx] += operand },
 						Op::Times => { monkey.holding[inspect_idx] *= operand }
@@ -174,8 +173,12 @@ fn main() -> Result<(), Error> {
 						else { panic!("Impossible error")};
 					other_monkey.holding.push(throw); // WAIT THIS IS WRONG
 				} else {
-					inspect_idx += 1;
+					// There's nothing semantically wrong with this (you could just move it to the end of self)
+					// But it could too easily lead to infinite loops
+					return Err(Error::new(ErrorKind::InvalidInput, "Assuming a monkey cannot throw to itself"))
+					//inspect_idx += 1;
 				}
+				monkey.inspections += 1;
 			}
 		}
 	}
