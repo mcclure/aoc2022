@@ -12,6 +12,7 @@ fn main() -> Result<(), Error> {
 		Some(x) => either::Right(BufReader::new(std::fs::File::open(x)?))
 	};
 
+	// Filter input to remove blank lines.
 	let mut lines = input.lines().filter(|x|match x { Ok(x) => !x.is_empty(), _ => true }).peekable();
 
 	let mut total: i64 = 0;
@@ -28,8 +29,18 @@ fn main() -> Result<(), Error> {
 
 		// Scan file
 		loop {
-			let line = next(&mut lines)?;
-			// Do stuff to "line"
+			let _ = next(&mut lines)?;
+			let a = next(&mut lines)?;
+			let b = next(&mut lines)?;
+			let c = next(&mut lines)?;
+			let d = next(&mut lines)?;
+			let e = next(&mut lines)?;
+
+			// In the actual program, I would push() a monkey struct onto an array of monkeys.
+			println!("'{}', '{}', '{}', '{}', '{}'", a, b, c, d, e);
+
+			// If EOF occurs at this known place, break cleanly.
+			if let None = lines.peek() { break }
 		}
 	}
 
