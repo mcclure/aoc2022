@@ -63,7 +63,7 @@ fn main() -> Result<(), Error> {
 			not_number() * positive() - whitespace()
 		}
 
-		fn ends_with_positive_list<'a>() -> Parser<'a, u8, Vec<u64>> { // Matches any line ending with
+		fn ends_with_positive_list<'a>(_:[&(); 0]) -> Parser<'a, u8, Vec<u64>> { // Matches any line ending with
 			not_number() * comma_separated_positive() - whitespace()   // a comma-separated list of ints
 		}
 
@@ -77,16 +77,19 @@ fn main() -> Result<(), Error> {
 		let invalide = |s| { Error::new(ErrorKind::InvalidInput, format!("Unrecognized line '{}'", s)) };
 		fn next<I, T:Iterator<Item = Result<I, Error>>>(l:&mut T) -> Result<I, Error> { match (*l).next() { Some(x) => x, None => Err(Error::new(ErrorKind::InvalidInput, "Incomplete monkey")) } }
 
+		fn next_parse<I2, T>(l:&mut T, p: for<'a> fn([&'a (); 0]) -> Parser<'a, u8, I2>) -> Result<I2, Error>
+				where T: Iterator<Item = Result<String, Error>> {
+			let temp = next(l)?;
+			let temp2 = temp.clone();
+			let temp3 = p([&(); 0]).parse(temp.as_bytes()).map_err(|_|Error::new(ErrorKind::InvalidInput, format!("Unrecognized line '{}'", temp2)));
+			temp3
+        }
+
 		// Scan file
 		loop {
 			let _ = next(&mut lines)?; // Discard monkey number
 			let monkey = Monkey {
-				starting: {
-					let temp = next(&mut lines)?;
-					let temp2 = temp.clone();
-					let temp = ends_with_positive_list().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
-					temp
-				},
+				starting: next_parse(&mut lines, ends_with_positive_list)?,
 				operation: {
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
