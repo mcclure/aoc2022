@@ -1,4 +1,5 @@
-// Parses a series of monkey descriptions.
+// Parses a series of monkey descriptions. Simulates anxiety.
+// Allows absurd amounts of anxiety.
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
@@ -24,7 +25,7 @@ struct Monkey {
 	inspections:u64
 }
 
-const MONKEY_ROUNDS:u64 = 20;
+const MONKEY_ROUNDS:u64 = 10000;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -152,13 +153,12 @@ fn main() -> Result<(), Error> {
 						Operand::Old => monkey.holding[inspect_idx],
 						Operand::Literal(n) => *n
 					};
+					println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // In case worry overflows...
 					match op {
 						Op::Plus  => { monkey.holding[inspect_idx] += operand },
 						Op::Times => { monkey.holding[inspect_idx] *= operand }
 					};
 				}
-				// THEN calm down
-				monkey.holding[inspect_idx] /= 3;
 				// THEN throw
 				let other_monkey_idx = if monkey.holding[inspect_idx] % monkey.divisible == 0 {
 					monkey.if_true

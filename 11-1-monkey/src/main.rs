@@ -1,4 +1,4 @@
-// Parses a series of monkey descriptions.
+// Parses a series of monkey descriptions. Simulates anxiety.
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
