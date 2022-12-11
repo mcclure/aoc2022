@@ -18,8 +18,11 @@ struct Monkey {
 	operation:(Op, Operand),
 	divisible:u64,
 	if_true:u64,
-	if_false:u64
+	if_false:u64,
+	inspections:u64
 }
+
+const MONKEY_ROUNDS:u64 = 20;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -32,7 +35,6 @@ fn main() -> Result<(), Error> {
 	// Filter input to remove blank lines.
 	let mut lines = input.lines().filter(|x|match x { Ok(x) => !x.is_empty(), _ => true }).peekable();
 
-	let mut total: u64 = 0;
 	let mut monkeys:Vec<Monkey> = Default::default();
 
 	{
@@ -110,7 +112,8 @@ fn main() -> Result<(), Error> {
 					let temp2 = temp.clone();
 					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
 					temp
-				}
+				},
+				inspections: 0
 			};
 
 			monkeys.push(monkey);
@@ -120,8 +123,29 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
-	// Final score
-	println!("{}", total);
+	for _ in 0..MONKEY_ROUNDS {
+		for monkey_idx in 0..monkeys.len() {
+			let (mut under, mut monkey) = monkeys.split_at_mut(monkey_idx);
+			let (mut monkey, mut over) = monkey.split_at_mut(1); // Notice monkey not monkeys
+			let mut monkey = &monkey[0];
+			let mut other_monkey = |other_idx:usize|->&mut Monkey {
+				if other_idx<monkey_idx { &mut under[other_idx] }
+				else if other_idx>monkey_idx { &mut over[other_idx-monkey_idx-1 ] }
+				else { panic!("Impossible error")}
+			};
+			// Do things here to monkeys
+		}
+	}
+
+	monkeys.sort_unstable_by_key(|x|std::cmp::Reverse(x.inspections)); // i64::MAX-
+
+	{
+		if monkeys.len() < 2 { return Err(Error::new(ErrorKind::InvalidInput, "Expected at least two monkeys")) }
+		let total = monkeys[0].inspections * monkeys[1].inspections;
+
+		// Final score
+		println!("{}", total);
+	}
 
 	Ok(())
 }
