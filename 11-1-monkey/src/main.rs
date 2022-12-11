@@ -4,21 +4,23 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
 
+#[derive(Debug)]
 enum Op {
 	Plus, Times
 }
 
+#[derive(Debug)]
 enum Operand {
 	Old,
 	Literal(u64)
 }
 
 struct Monkey {
-	starting:Vec<u64>,
+	holding:Vec<u64>,
 	operation:(Op, Operand),
 	divisible:u64,
-	if_true:u64,
-	if_false:u64,
+	if_true:usize,
+	if_false:usize,
 	inspections:u64
 }
 
@@ -79,11 +81,15 @@ fn main() -> Result<(), Error> {
 		let invalide = |s| { Error::new(ErrorKind::InvalidInput, format!("Unrecognized line '{}'", s)) };
 		fn next<I, T:Iterator<Item = Result<I, Error>>>(l:&mut T) -> Result<I, Error> { match (*l).next() { Some(x) => x, None => Err(Error::new(ErrorKind::InvalidInput, "Incomplete monkey")) } }
 
+		#[inline] fn as_usize(u:u64) -> Result<usize, Error> {
+			TryInto::<usize>::try_into(u).map_err(|_|Error::new(ErrorKind::InvalidInput, "Too many monkeys"))
+		}
+
 		// Scan file
 		loop {
 			let _ = next(&mut lines)?; // Discard monkey number
 			let monkey = Monkey {
-				starting: {
+				holding: {
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
 					let temp = ends_with_positive_list().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
@@ -101,18 +107,18 @@ fn main() -> Result<(), Error> {
 					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
 					temp
 				},
-				if_true: {
+				if_true: as_usize({
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
 					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
 					temp
-				},
-				if_false: {
+				})?,
+				if_false: as_usize({
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
 					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
 					temp
-				},
+				})?,
 				inspections: 0
 			};
 
@@ -127,13 +133,50 @@ fn main() -> Result<(), Error> {
 		for monkey_idx in 0..monkeys.len() {
 			let (mut under, mut monkey) = monkeys.split_at_mut(monkey_idx);
 			let (mut monkey, mut over) = monkey.split_at_mut(1); // Notice monkey not monkeys
-			let mut monkey = &monkey[0];
+			let mut monkey = &mut monkey[0];
+
+			/*
 			let mut other_monkey = |other_idx:usize|->&mut Monkey {
 				if other_idx<monkey_idx { &mut under[other_idx] }
 				else if other_idx>monkey_idx { &mut over[other_idx-monkey_idx-1 ] }
 				else { panic!("Impossible error")}
 			};
-			// Do things here to monkeys
+			*/
+
+			let mut inspect_idx = 0;
+			while inspect_idx < monkey.holding.len() {
+				// FIRST increment worry
+				{
+					let (op, operand) = &monkey.operation;
+					let operand = match operand {
+						Operand::Old => monkey.holding[inspect_idx],
+						Operand::Literal(n) => *n
+					};
+					println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // REMOVE ME
+					match op {
+						Op::Plus  => { monkey.holding[inspect_idx] += operand },
+						Op::Times => { monkey.holding[inspect_idx] *= operand }
+					};
+				}
+				// THEN calm down
+				monkey.holding[inspect_idx] /= 3;
+				// THEN throw
+				let other_monkey_idx = if monkey.holding[inspect_idx] % monkey.divisible == 0 {
+					monkey.if_true
+				} else {
+					monkey.if_false
+				};
+				if other_monkey_idx != monkey_idx {
+					let throw = monkey.holding.remove(inspect_idx);
+					let other_monkey = 
+						if other_monkey_idx<monkey_idx { &mut under[other_monkey_idx] }
+						else if other_monkey_idx>monkey_idx { &mut over[other_monkey_idx-monkey_idx-1 ] }
+						else { panic!("Impossible error")};
+					other_monkey.holding.push(throw); // WAIT THIS IS WRONG
+				} else {
+					inspect_idx += 1;
+				}
+			}
 		}
 	}
 
