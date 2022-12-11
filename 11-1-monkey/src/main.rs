@@ -14,11 +14,11 @@ enum Operand {
 }
 
 struct Monkey {
-	starting:Vec<i64>,
+	starting:Vec<u64>,
 	operation:(Op, Operand),
-	divisible:i64,
-	ifTrue:i64,
-	ifFalse:i64
+	divisible:u64,
+	if_true:u64,
+	if_false:u64
 }
 
 fn main() -> Result<(), Error> {
@@ -37,8 +37,6 @@ fn main() -> Result<(), Error> {
 
 	{
 		use pom::parser::*;
-
-		let invalide = || { Error::new(ErrorKind::InvalidInput, "Unrecognized line") };
 
 		fn positive<'a>() -> Parser<'a, u8, u64> {
 			let integer = (one_of(b"123456789") - one_of(b"0123456789").repeat(0..)) | sym(b'0');
@@ -71,28 +69,51 @@ fn main() -> Result<(), Error> {
 
 		fn ends_with_operation<'a>() -> Parser<'a, u8, (Op, Operand)> {
 			none_of(b"*+").repeat(0..) * (
-				( sym(b'+').map(|_|Op::Plus) | sym(b'*').map(|_|Op::Times) ) +
+				( (sym(b'+').map(|_|Op::Plus) | sym(b'*').map(|_|Op::Times)) - whitespace() ) + 
 				( seq(b"old").map(|_|Operand::Old) | positive().map(Operand::Literal))
 			)
 		}
 
+		let invalide = |s| { Error::new(ErrorKind::InvalidInput, format!("Unrecognized line '{}'", s)) };
 		fn next<I, T:Iterator<Item = Result<I, Error>>>(l:&mut T) -> Result<I, Error> { match (*l).next() { Some(x) => x, None => Err(Error::new(ErrorKind::InvalidInput, "Incomplete monkey")) } }
 
 		// Scan file
 		loop {
-			let _ = next(&mut lines)?; // Monkey number
-			//let monkey = Monkey {
-			//	starting: 
-			//}
-			let temp = next(&mut lines)?;
-			let a = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide())?;
-			let b = next(&mut lines)?;
-			let c = next(&mut lines)?;
-			let d = next(&mut lines)?;
-			let e = next(&mut lines)?;
+			let _ = next(&mut lines)?; // Discard monkey number
+			let monkey = Monkey {
+				starting: {
+					let temp = next(&mut lines)?;
+					let temp2 = temp.clone();
+					let temp = ends_with_positive_list().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					temp
+				},
+				operation: {
+					let temp = next(&mut lines)?;
+					let temp2 = temp.clone();
+					let temp = ends_with_operation().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					temp
+				},
+				divisible: {
+					let temp = next(&mut lines)?;
+					let temp2 = temp.clone();
+					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					temp
+				},
+				if_true: {
+					let temp = next(&mut lines)?;
+					let temp2 = temp.clone();
+					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					temp
+				},
+				if_false: {
+					let temp = next(&mut lines)?;
+					let temp2 = temp.clone();
+					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					temp
+				}
+			};
 
-			// In the actual program, I would push() a monkey struct onto an array of monkeys.
-			println!("'{}', '{}', '{}', '{}', '{}'", a, b, c, d, e);
+			monkeys.push(monkey);
 
 			// If EOF occurs at this known place, break cleanly.
 			if let None = lines.peek() { break }
