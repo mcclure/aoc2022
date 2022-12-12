@@ -18,7 +18,7 @@ fn main() -> Result<(), Error> {
 		let invalid2 = || { Err(Error::new(ErrorKind::InvalidInput, "Unrecognized characters")) };
 		let invalideg = |s| { Error::new(ErrorKind::InvalidInput, s) };
 
-		let mut grid : Array2<u8> = Default::default();
+		let mut grid : Option<Array2<u8>> = Default::default();
 		let mut trimming = false;
 		let mut width:usize = 0;
 		let mut line:Vec<u8> = Default::default();
@@ -29,8 +29,11 @@ fn main() -> Result<(), Error> {
 				if line.len()>0 {
 					if width==0 { width = line.len() }
 					else if line.len() != width { return invalid() }
-					println!("?? {} {} {}", line.len(), grid.nrows(), grid.ncols());
-					grid.push_row(ArrayView::from(&line)).unwrap(); // Unwrap to panic on impossible error
+					//println!("?? {} {} {}", line.len(), grid.nrows(), grid.ncols());
+					if grid == None {
+						grid = Some(Array2::zeros((0,width)));
+					} 
+					grid.as_mut().unwrap().push_row(ArrayView::from(&line)).unwrap(); // Unwrap to panic on impossible error
 					line = Default::default()
 				}
 				continue
@@ -45,13 +48,13 @@ fn main() -> Result<(), Error> {
 
 			line.push(match ch {
 				'a'..='z' => { (ch as u8) - ('a' as u8) }
-				'S' => { start = Some(UVec2::new(line.len() as u32, grid.nrows() as u32)); 0  }
-				'E' => { end   = Some(UVec2::new(line.len() as u32, grid.nrows() as u32)); 25 }
+				'S' => { start = Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 })); 0  }
+				'E' => { end   = Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 })); 25 }
 				_ => return invalid2()
 			})
 		}
 
-		(grid,
+		(grid .ok_or_else(||invalideg("File is empty"))?,
 		 start.ok_or_else(||invalideg("No start point"))?,
 		 end  .ok_or_else(||invalideg("No start point"))?)
 	};
