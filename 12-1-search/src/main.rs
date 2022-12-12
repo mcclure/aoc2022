@@ -3,9 +3,13 @@
 use std::io::{Error, ErrorKind};
 use char_reader::CharReader;
 use ndarray::{Array2, ArrayView};
-use glam::UVec2;
+use glam::IVec2;
+use pathfinding::directed::astar::astar;
+use ordered_float::NotNan;
 
 fn main() -> Result<(), Error> {
+	let invalideg = |s| { Error::new(ErrorKind::InvalidInput, s) };
+
 	let (grid, start, end) = { // Populate from file
 		// Load file from command-line argument
 		let filename = std::env::args().fuse().nth(1);
@@ -16,13 +20,12 @@ fn main() -> Result<(), Error> {
 
 		let invalid = || { Err(Error::new(ErrorKind::InvalidInput, "Inconsistent sized lines")) };
 		let invalid2 = || { Err(Error::new(ErrorKind::InvalidInput, "Unrecognized characters")) };
-		let invalideg = |s| { Error::new(ErrorKind::InvalidInput, s) };
 
 		let mut grid : Option<Array2<u8>> = Default::default();
 		let mut trimming = false;
 		let mut width:usize = 0;
 		let mut line:Vec<u8> = Default::default();
-		let (mut start, mut end):(Option<UVec2>,Option<UVec2>) = Default::default(); 
+		let (mut start, mut end):(Option<IVec2>,Option<IVec2>) = Default::default(); 
 		while let Some(ch) = chars.next_char()? {
 			if ch == '\n' || ch == '\r' { // End of line
 				trimming = false;
@@ -31,7 +34,7 @@ fn main() -> Result<(), Error> {
 					else if line.len() != width { return invalid() }
 					//println!("?? {} {} {}", line.len(), grid.nrows(), grid.ncols());
 					if grid == None {
-						grid = Some(Array2::zeros((0,width)));
+						grid = Some(Array2::zeros((0, width)));
 					} 
 					grid.as_mut().unwrap().push_row(ArrayView::from(&line)).unwrap(); // Unwrap to panic on impossible error
 					line = Default::default()
@@ -46,8 +49,8 @@ fn main() -> Result<(), Error> {
 			}
 			if trimming { return invalid2() }
 
-			line.push({
-				let at = || Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 }));
+			line.push({ // Will panic on arrays longer than 2^31 I guess
+				let at = || Some(IVec2::new(line.len() as i32, match grid { None => 0, Some(ref grid) => grid.nrows() as i32 }));
 				match ch {
 					'a'..='z' => { (ch as u8) - ('a' as u8) }
 					'S' => { start = at(); 0  }
@@ -62,10 +65,25 @@ fn main() -> Result<(), Error> {
 		 end  .ok_or_else(||invalideg("No start point"))?)
 	};
 
-	println!("{:?}, {}, {}", grid, start, end);
+	//println!("{:?}, {}, {}", grid, start, end);
 
-	// Final score
-	//println!("{}", total);
+	{
+		let cardinals = [IVec2::new(1,0), IVec2::new(0,-1), IVec2::new(-1,0), IVec2::new(0,1)];
 
-	Ok(())
+		// <N, C, FN, IN, FH, FS> N = Vec2, C = f32, IN = vec<(Vec2,f32)>
+		if let Some((path, _)) = astar(
+		    &start,
+		    |&at| {
+		    	return [];
+		    },
+		    |&at| NotNan::new((at - end).as_vec2().length()).unwrap(),
+		    |&at| at == end
+		) {
+			println!("{}", path.len());
+
+			Ok(())
+		} else {
+			Err(invalideg("No path from start to end"))
+		}
+	}
 }
