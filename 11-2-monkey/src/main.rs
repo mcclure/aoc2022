@@ -4,6 +4,8 @@
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
+use num_traits::{Zero, FromPrimitive};
+use num_bigint::BigUint;
 
 #[derive(Debug)]
 enum Op {
@@ -17,7 +19,7 @@ enum Operand {
 }
 
 struct Monkey {
-	holding:Vec<u64>,
+	holding:Vec<BigUint>,
 	operation:(Op, Operand),
 	divisible:u64,
 	if_true:usize,
@@ -39,6 +41,10 @@ fn main() -> Result<(), Error> {
 	let mut lines = input.lines().filter(|x|match x { Ok(x) => !x.is_empty(), _ => true }).peekable();
 
 	let mut monkeys:Vec<Monkey> = Default::default();
+
+	#[inline] fn as_bignum(u:&u64) -> Result<BigUint, Error> {
+		BigUint::from_u64(*u).ok_or_else(||Error::new(ErrorKind::InvalidInput, "Too many monkeys"))
+	}
 
 	{
 		use pom::parser::*;
@@ -95,7 +101,7 @@ fn main() -> Result<(), Error> {
 					let temp2 = temp.clone();
 					let temp = ends_with_positive_list().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
 					temp
-				},
+				}.iter().map(as_bignum).collect::<Result<Vec<BigUint>, Error>>()?,
 				operation: {
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
@@ -130,7 +136,7 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
-	for _ in 0..MONKEY_ROUNDS {
+	for r in 0..MONKEY_ROUNDS {
 		for monkey_idx in 0..monkeys.len() {
 			let (mut under, mut monkey) = monkeys.split_at_mut(monkey_idx);
 			let (mut monkey, mut over) = monkey.split_at_mut(1); // Notice monkey not monkeys
@@ -150,17 +156,17 @@ fn main() -> Result<(), Error> {
 				{
 					let (op, operand) = &monkey.operation;
 					let operand = match operand {
-						Operand::Old => monkey.holding[inspect_idx],
-						Operand::Literal(n) => *n
+						Operand::Old => monkey.holding[inspect_idx].clone(),
+						Operand::Literal(n) => as_bignum(n)?
 					};
-					println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // In case worry overflows...
+					//println!("{} {:?} {}", monkey.holding[inspect_idx].clone(), op, operand); // In case worry overflows...
 					match op {
 						Op::Plus  => { monkey.holding[inspect_idx] += operand },
 						Op::Times => { monkey.holding[inspect_idx] *= operand }
 					};
 				}
 				// THEN throw
-				let other_monkey_idx = if monkey.holding[inspect_idx] % monkey.divisible == 0 {
+				let other_monkey_idx = if monkey.holding[inspect_idx].clone() % monkey.divisible == Zero::zero() {
 					monkey.if_true
 				} else {
 					monkey.if_false
@@ -181,6 +187,7 @@ fn main() -> Result<(), Error> {
 				monkey.inspections += 1;
 			}
 		}
+		println!("Round {}", r);
 	}
 
 	monkeys.sort_unstable_by_key(|x|std::cmp::Reverse(x.inspections)); // i64::MAX-
