@@ -2,10 +2,13 @@
 
 use std::io::{Error, ErrorKind};
 use char_reader::CharReader;
-use ndarray::{Array2, ArrayView};
+use ndarray::{Array2, ArrayView, Axis};
 use glam::IVec2;
 use pathfinding::directed::astar::astar;
 use ordered_float::NotNan;
+
+const DEBUG:bool = false;
+const DEBUG_ANIMATE:bool = false;
 
 fn main() -> Result<(), Error> {
 	let invalideg = |s| { Error::new(ErrorKind::InvalidInput, s) };
@@ -70,6 +73,7 @@ fn main() -> Result<(), Error> {
 	{
 		let cardinals = [IVec2::new(1,0), IVec2::new(0,-1), IVec2::new(-1,0), IVec2::new(0,1)];
 		fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
+		fn to_letter(u:u8) -> char { (u + ('a' as u8)) as char }
 		let one = NotNan::new(1.0).unwrap();
 
 		// <N, C, FN, IN, FH, FS> N = Vec2, C = f32, IN = vec<(Vec2,f32)>
@@ -81,7 +85,7 @@ fn main() -> Result<(), Error> {
 		    	for card in cardinals {
 		    		let cand = at + card;
 					if cand.x >= 0 && cand.y >= 0 {
-						if let Some(&cand_val) = grid.get(to_index(at)) {
+						if let Some(&cand_val) = grid.get(to_index(cand)) {
 							if !(cand_val > at_val + 1) {
 								ok.push((cand, one))
 							}
@@ -93,7 +97,35 @@ fn main() -> Result<(), Error> {
 		    |&at| NotNan::new((at - end).as_vec2().length()).unwrap(),
 		    |&at| at == end
 		) {
-			println!("{}", path.len());
+			if DEBUG {
+				use ansi_term::Style;
+				use ansi_term::Colour::{Black, White};
+
+				let text = Style::new();
+				let invert = Style::new().fg(Black).on(White);
+
+				for &at in &path {
+					if DEBUG_ANIMATE { print!("\x1B[2J\x1B[1;1H"); }
+					println!("\tAt: {} Thinks: {}", at, to_letter(grid[to_index(at)]));
+					for (y, col) in grid.axis_iter(Axis(0)).enumerate() {
+						for (x, v) in col.iter().enumerate() {
+							let print_at = IVec2::new(x as i32,y as i32);
+							print!("{}", {
+								let ch = (
+									if print_at == start { 'S' }
+									else if print_at == end { 'E' }
+									else { to_letter(*v) }
+								).to_string();
+								if print_at == at { invert.paint(ch) } else { text.paint(ch) }
+							})
+						}
+						println!("");
+					}
+					println!("");
+				} 
+			}
+
+			println!("{}", path.len() - 1);
 
 			Ok(())
 		} else {
