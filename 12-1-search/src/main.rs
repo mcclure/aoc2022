@@ -46,11 +46,14 @@ fn main() -> Result<(), Error> {
 			}
 			if trimming { return invalid2() }
 
-			line.push(match ch {
-				'a'..='z' => { (ch as u8) - ('a' as u8) }
-				'S' => { start = Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 })); 0  }
-				'E' => { end   = Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 })); 25 }
-				_ => return invalid2()
+			line.push({
+				let at = || Some(UVec2::new(line.len() as u32, match grid { None => 0, Some(ref grid) => grid.nrows() as u32 }));
+				match ch {
+					'a'..='z' => { (ch as u8) - ('a' as u8) }
+					'S' => { start = at(); 0  }
+					'E' => { end   = at(); 25 }
+					_ => return invalid2()
+				}
 			})
 		}
 
