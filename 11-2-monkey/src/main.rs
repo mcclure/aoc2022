@@ -155,15 +155,23 @@ fn main() -> Result<(), Error> {
 				// FIRST increment worry
 				{
 					let (op, operand) = &monkey.operation;
-					let operand = match operand {
-						Operand::Old => monkey.holding[inspect_idx].clone(),
-						Operand::Literal(n) => as_bignum(n)?
+					match operand {
+						Operand::Old => {
+							match op {
+								Op::Plus  => { monkey.holding[inspect_idx] *= as_bignum(&2)? },
+								Op::Times => { monkey.holding[inspect_idx] = monkey.holding[inspect_idx].pow(2) }
+							};
+						},
+						Operand::Literal(n) => {
+							let temp = as_bignum(n)?;
+							match op {
+								Op::Plus  => { monkey.holding[inspect_idx] += temp },
+								Op::Times => { monkey.holding[inspect_idx] *= temp }
+							};
+						}
 					};
 					//println!("{} {:?} {}", monkey.holding[inspect_idx].clone(), op, operand); // In case worry overflows...
-					match op {
-						Op::Plus  => { monkey.holding[inspect_idx] += operand },
-						Op::Times => { monkey.holding[inspect_idx] *= operand }
-					};
+					
 				}
 				// THEN throw
 				let other_monkey_idx = if &monkey.holding[inspect_idx] % monkey.divisible == Zero::zero() {
