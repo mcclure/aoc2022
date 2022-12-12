@@ -34,7 +34,7 @@ fn main() -> Result<(), Error> {
 					else if line.len() != width { return invalid() }
 					//println!("?? {} {} {}", line.len(), grid.nrows(), grid.ncols());
 					if grid == None {
-						grid = Some(Array2::zeros((0, width)));
+						grid = Some(Array2::zeros((0, width))); // ROW MAJOR
 					} 
 					grid.as_mut().unwrap().push_row(ArrayView::from(&line)).unwrap(); // Unwrap to panic on impossible error
 					line = Default::default()
@@ -69,12 +69,26 @@ fn main() -> Result<(), Error> {
 
 	{
 		let cardinals = [IVec2::new(1,0), IVec2::new(0,-1), IVec2::new(-1,0), IVec2::new(0,1)];
+		fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
+		let one = NotNan::new(1.0).unwrap();
 
 		// <N, C, FN, IN, FH, FS> N = Vec2, C = f32, IN = vec<(Vec2,f32)>
 		if let Some((path, _)) = astar(
 		    &start,
 		    |&at| {
-		    	return [];
+		    	let mut ok:Vec<(IVec2,NotNan<f32>)> = Default::default();
+		    	let at_val = grid[to_index(at)];
+		    	for card in cardinals {
+		    		let cand = at + card;
+					if cand.x >= 0 && cand.y >= 0 {
+						if let Some(&cand_val) = grid.get(to_index(at)) {
+							if !(cand_val > at_val + 1) {
+								ok.push((cand, one))
+							}
+						}
+					}
+		    	}
+		    	ok
 		    },
 		    |&at| NotNan::new((at - end).as_vec2().length()).unwrap(),
 		    |&at| at == end
