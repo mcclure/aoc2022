@@ -166,7 +166,7 @@ fn main() -> Result<(), Error> {
 					};
 				}
 				// THEN throw
-				let other_monkey_idx = if monkey.holding[inspect_idx].clone() % monkey.divisible == Zero::zero() {
+				let other_monkey_idx = if &monkey.holding[inspect_idx] % monkey.divisible == Zero::zero() {
 					monkey.if_true
 				} else {
 					monkey.if_false
@@ -187,7 +187,7 @@ fn main() -> Result<(), Error> {
 				monkey.inspections += 1;
 			}
 		}
-		println!("Round {}", r);
+		if 0==r%10 { println!("Round {}", r); }
 	}
 
 	monkeys.sort_unstable_by_key(|x|std::cmp::Reverse(x.inspections)); // i64::MAX-
