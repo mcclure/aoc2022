@@ -39,6 +39,7 @@ fn main() -> Result<(), Error> {
 	let mut lines = input.lines().filter(|x|match x { Ok(x) => !x.is_empty(), _ => true }).peekable();
 
 	let mut monkeys:Vec<Monkey> = Default::default();
+	let mut modulus:u64 = 1;
 
 	{
 		use pom::parser::*;
@@ -106,6 +107,7 @@ fn main() -> Result<(), Error> {
 					let temp = next(&mut lines)?;
 					let temp2 = temp.clone();
 					let temp = ends_with_positive().parse(temp.as_bytes()).map_err(|_|invalide(temp2))?;
+					if modulus % temp != 0 { modulus *= temp };
 					temp
 				},
 				if_true: as_usize({
@@ -153,11 +155,12 @@ fn main() -> Result<(), Error> {
 						Operand::Old => monkey.holding[inspect_idx],
 						Operand::Literal(n) => *n
 					};
-					println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // In case worry overflows...
+					//println!("{} {:?} {}", monkey.holding[inspect_idx], op, operand); // In case worry overflows...
 					match op {
 						Op::Plus  => { monkey.holding[inspect_idx] += operand },
 						Op::Times => { monkey.holding[inspect_idx] *= operand }
 					};
+					monkey.holding[inspect_idx] %= modulus;
 				}
 				// THEN throw
 				let other_monkey_idx = if monkey.holding[inspect_idx] % monkey.divisible == 0 {
