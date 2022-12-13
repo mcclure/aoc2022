@@ -11,6 +11,9 @@ enum Node {
 	List(Vec<Node>)
 }
 
+const DEBUG:bool = true;
+const DEBUG_FAILURE_ONLY:bool = true;
+
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
 	let filename = std::env::args().fuse().nth(1);
@@ -93,7 +96,42 @@ fn main() -> Result<(), Error> {
 								total += idx_at;
 							}
 
-							println!("COMPARE {}\n{:?}\n{:?}\n{} ({:?})\n", idx_at, last_node, node, if correct {"*** YES"} else {"    NO "}, cmp);
+							if DEBUG && !(DEBUG_FAILURE_ONLY && correct) {
+								fn printable_one_line(l:Vec<Node>) -> bool {
+									return l.iter().all(|x| 
+										match x.clone() { Node::Num(_)=>true, 
+											Node::List(l)=> {
+												l.len()==0 || (l.len() == 1 && printable_one_line(l))
+									}})
+								}
+								fn debug_tree(n:Node, depth:i64) {
+									for _ in 0..depth { print!("\t") }
+									match n {
+										Node::Num(n) => print!("{}", n),
+										Node::List(l) => {
+											print!("[");
+											if printable_one_line(l.clone()) {
+												for (idx,i) in l.into_iter().enumerate() {
+													if idx>0 { print!(", ") }
+													debug_tree(i, -1);
+												}
+											}  else {
+												for (idx,i) in l.into_iter().enumerate() {
+													if idx>0 { println!(", ") } else { println!("") }
+													debug_tree(i, depth+1);
+												}
+											}
+											print!("]");
+										}
+									}
+									if depth==0 { println!("") }
+								}
+
+								println!("COMPARE {}", idx_at);
+								debug_tree((*last_node).clone(), 0);
+								debug_tree(node, 0);
+								println!("{} ({:?})\n", if correct {"*** YES"} else {"    NO "}, cmp);
+							}
 
 							idx_at += 1;
 							last = None;
