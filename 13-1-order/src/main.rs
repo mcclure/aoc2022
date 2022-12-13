@@ -2,6 +2,7 @@
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
+use std::cmp::Ordering;
 use either::Either;
 
 #[derive(Debug, Clone)]
@@ -68,27 +69,31 @@ fn main() -> Result<(), Error> {
 						Some(ref last_node) => {
 							// Actual program lives here
 
-							fn compare(a:Node, b:Node) -> bool {
+							fn compare(a:Node, b:Node) -> Ordering {
 								match (a,b) {
-									(Node::Num(a), Node::Num(b)) => a <= b,
+									(Node::Num(a), Node::Num(b)) => a.cmp(&b),
 									(Node::List(a), Node::List(b)) => {
+										let mut all_equal = true;
 										for (a,b) in std::iter::zip(a.clone(),b.clone()) {
-											if !compare(a,b) { return false }
+											let cmp = compare(a,b);
+											if cmp == Ordering::Greater { return Ordering::Greater }
+											if cmp == Ordering::Less { all_equal = false }
 										}
-										a.len()>=b.len()
+										if all_equal { a.len().cmp(&b.len()) } else { Ordering::Less }
 									},
 									(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b),
 									(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b])),
 								}
 							}
 
-							let correct = compare((*last_node).clone(), node.clone());
+							let cmp = compare((*last_node).clone(), node.clone());
+							let correct = cmp != Ordering::Greater;
 
 							if correct {
 								total += idx_at;
 							}
 
-							println!("COMPARE {}\n{:?}\n{:?}\n{}\n", idx_at, last_node, node, correct);
+							println!("COMPARE {}\n{:?}\n{:?}\n{} ({:?})\n", idx_at, last_node, node, if correct {"*** YES"} else {"    NO "}, cmp);
 
 							idx_at += 1;
 							last = None;
