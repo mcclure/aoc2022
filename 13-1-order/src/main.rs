@@ -4,7 +4,7 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use either::Either;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum Node {
 	Num(u64),
 	List(Vec<Node>)
@@ -18,7 +18,7 @@ fn main() -> Result<(), Error> {
 		Some(x) => either::Right(BufReader::new(std::fs::File::open(x)?))
 	};
 
-	let mut lines = input.lines();
+	let lines = input.lines();
 
 	let mut total: i64 = 0;
 
@@ -52,6 +52,7 @@ fn main() -> Result<(), Error> {
 		}
 
 		let mut last: Option<Node> = Default::default();
+		let mut idx_at = 1; // 1-index
 
 		for line in lines {
 			let line = line?;
@@ -64,8 +65,32 @@ fn main() -> Result<(), Error> {
 				Ok(node) => {
 					match last {
 						None => { last = Some(node); }
-						Some(ref x) => {
-							println!("COMPARE!\n{:?}\n{:?}\n", x, node);
+						Some(ref last_node) => {
+							// Actual program lives here
+
+							fn compare(a:Node, b:Node) -> bool {
+								match (a,b) {
+									(Node::Num(a), Node::Num(b)) => a <= b,
+									(Node::List(a), Node::List(b)) => {
+										for (a,b) in std::iter::zip(a.clone(),b.clone()) {
+											if !compare(a,b) { return false }
+										}
+										a.len()>=b.len()
+									},
+									(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b),
+									(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b])),
+								}
+							}
+
+							let correct = compare((*last_node).clone(), node.clone());
+
+							if correct {
+								total += idx_at;
+							}
+
+							println!("COMPARE {}\n{:?}\n{:?}\n{}\n", idx_at, last_node, node, correct);
+
+							idx_at += 1;
 							last = None;
 						}
 					}
