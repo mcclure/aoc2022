@@ -23,7 +23,7 @@ fn main() -> Result<(), Error> {
 
 	let mut total: i64 = 0;
 
-	let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Line not understood: {}", s))) };
+	let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Line not understood: '{}'", s))) };
 	let invalid2 = || { return Err(Error::new(ErrorKind::InvalidInput, "Odd number of lines")) };
 
 	// Scan file
