@@ -22,7 +22,8 @@ fn main() -> Result<(), Error> {
 
 	let mut total: i64 = 0;
 
-//	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
+	let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Line not understood: {}", s))) };
+	let invalid2 = || { return Err(Error::new(ErrorKind::InvalidInput, "Odd number of lines")) };
 
 	// Scan file
 	{
@@ -50,14 +51,30 @@ fn main() -> Result<(), Error> {
 			) - whitespace() - sym(b']')
 		}
 
+		let mut last: Option<Node> = Default::default();
+
 		for line in lines {
 			let line = line?;
 			let line = line.trim();
 			if line.is_empty() { continue }
 
-			println!("{}", line);
 			let parsed = (comma_separated_list() - end()).parse(line.as_bytes());
-			println!("{:?}", parsed);
+			match parsed {
+				Err(_) => return invalid(line),
+				Ok(node) => {
+					match last {
+						None => { last = Some(node); }
+						Some(ref x) => {
+							println!("COMPARE!\n{:?}\n{:?}\n", x, node);
+							last = None;
+						}
+					}
+				}
+			}
+		}
+
+		if !last.is_none() {
+			return invalid2();
 		}
 	}
 
