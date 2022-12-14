@@ -16,7 +16,8 @@ const DEBUG:bool = true;
 const DEBUG_FULL:bool = true;
 const DEBUG_FAILURE_ONLY:bool = false;
 const DEBUG_INLINE:bool = true;
-const DEBUG_REGURGITATE:bool = false;
+const DEBUG_DIGEST:bool = true;
+const DEBUG_REGURGITATE:bool = true;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -60,6 +61,7 @@ fn main() -> Result<(), Error> {
 		}
 
 		let mut last: Option<Node> = Default::default();
+		let mut digest:String = Default::default();
 		let mut idx_at = 1; // 1-index
 
 		use ansi_term::Style;
@@ -89,24 +91,18 @@ fn main() -> Result<(), Error> {
 										cmp
 									},
 									(Node::List(a), Node::List(b)) => {
-										let mut all_equal = true;
 										if DEBUG_INLINE { i(depth); println!("["); }
 										for (a,b) in std::iter::zip(a.clone(),b.clone()) {
 											let cmp = compare(a,b,depth+1);
-											if cmp == Ordering::Greater {
-												if DEBUG_INLINE { i(depth); println!("] {}", t(Ordering::Greater)); }
-												return Ordering::Greater
+											if cmp != Ordering::Equal {
+												if DEBUG_INLINE { i(depth); println!("] {}", t(cmp)); }
+												return cmp
 											}
-											if cmp == Ordering::Less { all_equal = false }
 										}
-										if all_equal {
-											let cmp = a.len().cmp(&b.len());
-											if DEBUG_INLINE { i(depth); println!("] {} len {} < len {}: {:?} {}", Style::new().fg(Yellow).paint("EQ"), b.len(), a.len(), cmp, t(cmp)); }
-											cmp
-										} else { 
-											if DEBUG_INLINE { i(depth); println!("] {}{}", t(Ordering::Less), if a.len() != b.len() { " ..." } else {""}); }
-											Ordering::Less
-										}
+
+										let cmp = a.len().cmp(&b.len());
+										if DEBUG_INLINE { i(depth); println!("] {} len {} < len {}: {:?} {}", Style::new().fg(Yellow).paint("EQ"), b.len(), a.len(), cmp, t(cmp)); }
+										cmp
 									},
 									(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b, depth),
 									(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b]), depth),
@@ -160,7 +156,7 @@ fn main() -> Result<(), Error> {
 									s
 								}
 								if DEBUG_REGURGITATE {
-									print!("{}\n{}\n\n", debug_tree((*last_node).clone(), 0, false), debug_tree(node.clone(), 0, false));
+									print!("{}\n{}\n", debug_tree((*last_node).clone(), 0, false), debug_tree(node.clone(), 0, false));
 								}
 								if DEBUG && !(DEBUG_FAILURE_ONLY && correct) {
 									println!("COMPARE {}", idx_at);
@@ -192,8 +188,9 @@ fn main() -> Result<(), Error> {
 										println!("{}{}", gray1.paint(" ".repeat(left_width)), gray2.paint(" ".repeat(right_width)));
 									}
 									println!("{} ({:?})\n", if correct {Style::new().paint("*** YES")} else {Style::new().fg(Black).on(Fixed(9)).paint("    NO ")}, cmp);
-								} else if DEBUG_INLINE { println!("") }
+								} else if DEBUG_INLINE || DEBUG_REGURGITATE { println!("") }
 							}
+							if DEBUG_DIGEST { digest += if correct {"Y"} else {"N"} }
 
 							idx_at += 1;
 							last = None;
@@ -203,9 +200,12 @@ fn main() -> Result<(), Error> {
 			}
 		}
 
+		if DEBUG_DIGEST { println!("{}", digest) }
+
 		if !last.is_none() {
 			return invalid2();
 		}
+
 	}
 
 	// Final score
