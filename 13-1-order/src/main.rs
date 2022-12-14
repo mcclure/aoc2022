@@ -100,7 +100,7 @@ fn main() -> Result<(), Error> {
 										}
 										if all_equal {
 											let cmp = a.len().cmp(&b.len());
-											if DEBUG_INLINE { i(depth); println!("] {} {} < {}: {:?} {}", Style::new().fg(Yellow).paint("EQ"), a.len(), b.len(), cmp, t(Ordering::Less)); }
+											if DEBUG_INLINE { i(depth); println!("] {} len {} < len {}: {:?} {}", Style::new().fg(Yellow).paint("EQ"), b.len(), a.len(), cmp, t(cmp)); }
 											cmp
 										} else { 
 											if DEBUG_INLINE { i(depth); println!("] {}{}", t(Ordering::Less), if a.len() != b.len() { " ..." } else {""}); }
@@ -120,12 +120,15 @@ fn main() -> Result<(), Error> {
 							}
 
 							if DEBUG && !(DEBUG_FAILURE_ONLY && correct) {
-								fn printable_one_line(l:Vec<Node>) -> bool {
+								fn printable_one_line(_l:Vec<Node>) -> bool {
+									false
+								/*	 // No good in two column mode.
 									return l.iter().all(|x| 
 										match x.clone() { Node::Num(_)=>true, 
 											Node::List(l)=> {
 												l.len()==0 || (l.len() == 1 && printable_one_line(l))
 									}})
+									*/
 								}
 								fn debug_tree(n:Node, depth:i64) -> String {
 									let mut s:String = "".to_string();
