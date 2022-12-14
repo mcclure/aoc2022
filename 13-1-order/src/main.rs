@@ -12,7 +12,9 @@ enum Node {
 }
 
 const DEBUG:bool = true;
-const DEBUG_FAILURE_ONLY:bool = true;
+const DEBUG_FULL:bool = true;
+const DEBUG_FAILURE_ONLY:bool = false;
+const DEBUG_INLINE:bool = true;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -58,6 +60,9 @@ fn main() -> Result<(), Error> {
 		let mut last: Option<Node> = Default::default();
 		let mut idx_at = 1; // 1-index
 
+		use ansi_term::Style;
+		use ansi_term::Colour::{Yellow, Black, Fixed};
+
 		for line in lines {
 			let line = line?;
 			let line = line.trim();
@@ -71,25 +76,42 @@ fn main() -> Result<(), Error> {
 						None => { last = Some(node); }
 						Some(ref last_node) => {
 							// Actual program lives here
+							fn i(depth:u64) { for _ in 0..depth {print!("  ")}}
+							fn t(v: Ordering) -> &'static str { if v==Ordering::Greater {"👎🏻"} else {"👍"} }
 
-							fn compare(a:Node, b:Node) -> Ordering {
+							fn compare(a:Node, b:Node, depth:u64) -> Ordering {
 								match (a,b) {
-									(Node::Num(a), Node::Num(b)) => a.cmp(&b),
+									(Node::Num(a), Node::Num(b)) => {
+										let cmp = a.cmp(&b);
+										if DEBUG_INLINE { i(depth); println!("{} < {}: {:?} {}", a, b, cmp, t(cmp)); }
+										cmp
+									},
 									(Node::List(a), Node::List(b)) => {
 										let mut all_equal = true;
+										if DEBUG_INLINE { i(depth); println!("["); }
 										for (a,b) in std::iter::zip(a.clone(),b.clone()) {
-											let cmp = compare(a,b);
-											if cmp == Ordering::Greater { return Ordering::Greater }
+											let cmp = compare(a,b,depth+1);
+											if cmp == Ordering::Greater {
+												if DEBUG_INLINE { i(depth); println!("] {}", t(Ordering::Greater)); }
+												return Ordering::Greater
+											}
 											if cmp == Ordering::Less { all_equal = false }
 										}
-										if all_equal { a.len().cmp(&b.len()) } else { Ordering::Less }
+										if all_equal {
+											let cmp = a.len().cmp(&b.len());
+											if DEBUG_INLINE { i(depth); println!("] {} {} < {}: {:?} {}", Style::new().fg(Yellow).paint("EQ"), a.len(), b.len(), cmp, t(Ordering::Less)); }
+											cmp
+										} else { 
+											if DEBUG_INLINE { i(depth); println!("] {}{}", t(Ordering::Less), if a.len() != b.len() { " ..." } else {""}); }
+											Ordering::Less
+										}
 									},
-									(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b),
-									(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b])),
+									(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b, depth),
+									(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b]), depth),
 								}
 							}
 
-							let cmp = compare((*last_node).clone(), node.clone());
+							let cmp = compare((*last_node).clone(), node.clone(),1);
 							let correct = cmp != Ordering::Greater;
 
 							if correct {
@@ -128,10 +150,13 @@ fn main() -> Result<(), Error> {
 								}
 
 								println!("COMPARE {}", idx_at);
-								debug_tree((*last_node).clone(), 0);
-								debug_tree(node, 0);
-								println!("{} ({:?})\n", if correct {"*** YES"} else {"    NO "}, cmp);
-							}
+								if DEBUG_FULL {
+									debug_tree((*last_node).clone(), 0);
+									debug_tree(node, 0);
+								}
+								println!("{} ({:?})\n", if correct {Style::new().paint("*** YES")} else {Style::new().fg(Black).on(Fixed(9)).paint("    NO ")}, cmp);
+							} else if DEBUG_INLINE { println!("") }
+
 
 							idx_at += 1;
 							last = None;
