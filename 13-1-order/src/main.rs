@@ -2,8 +2,9 @@
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
-use std::cmp::Ordering;
+use std::cmp::{Ordering, max};
 use either::Either;
+use itertools::{EitherOrBoth, Itertools};
 
 #[derive(Debug, Clone)]
 enum Node {
@@ -126,33 +127,57 @@ fn main() -> Result<(), Error> {
 												l.len()==0 || (l.len() == 1 && printable_one_line(l))
 									}})
 								}
-								fn debug_tree(n:Node, depth:i64) {
-									for _ in 0..depth { print!("\t") }
+								fn debug_tree(n:Node, depth:i64) -> String {
+									let mut s:String = "".to_string();
+									for _ in 0..depth { s += "    " }
 									match n {
-										Node::Num(n) => print!("{}", n),
+										Node::Num(n) => s += &format!("{}", n),
 										Node::List(l) => {
-											print!("[");
+											s += "[";
 											if printable_one_line(l.clone()) {
 												for (idx,i) in l.into_iter().enumerate() {
-													if idx>0 { print!(", ") }
-													debug_tree(i, -1);
+													if idx>0 { s += ", " }
+													s += &debug_tree(i, -1);
 												}
 											}  else {
 												for (idx,i) in l.into_iter().enumerate() {
-													if idx>0 { println!(", ") } else { println!("") }
-													debug_tree(i, depth+1);
+													s += if idx>0 { ", \n" } else { "\n" };
+													s += &debug_tree(i, depth+1);
 												}
 											}
-											print!("]");
+											s += "]";
 										}
 									}
-									if depth==0 { println!("") }
+									if depth==0 { s += "" }
+									s
 								}
 
 								println!("COMPARE {}", idx_at);
 								if DEBUG_FULL {
-									debug_tree((*last_node).clone(), 0);
-									debug_tree(node, 0);
+									let gray1 = Style::new().on(Fixed(236));
+									let gray2 = Style::new().on(Fixed(237));
+
+									let left = debug_tree((*last_node).clone(), 0);
+									let right = debug_tree(node, 0);
+									fn str_width(s:&str) -> usize { // Width of longest line in s
+										let mut x = 0;
+										for line in s.lines() {
+											x = max(x, line.len());
+										}
+										x
+									}
+									let left_width = str_width(&left);
+									let right_width = str_width(&right);
+									for x in left.lines().zip_longest(right.lines()) {
+										let (left, right) = match x {
+											EitherOrBoth::Both(left, right) => (left, right),
+											EitherOrBoth::Left(left) => (left, ""),
+											EitherOrBoth::Right(right) => ("", right)
+										};
+										println!("{}{}{}{}", gray1.paint(left), gray1.paint(" ".repeat(left_width - left.len())),
+											gray2.paint(right), gray2.paint(" ".repeat(right_width - right.len())));
+									}
+									println!("{}{}", gray1.paint(" ".repeat(left_width)), gray2.paint(" ".repeat(right_width)));
 								}
 								println!("{} ({:?})\n", if correct {Style::new().paint("*** YES")} else {Style::new().fg(Black).on(Fixed(9)).paint("    NO ")}, cmp);
 							} else if DEBUG_INLINE { println!("") }

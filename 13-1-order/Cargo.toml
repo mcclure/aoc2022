@@ -8,4 +8,5 @@ edition = "2021"
 [dependencies]
 ansi_term = "0.12.1"
 either = "1.8.0"
+itertools = "0.10.5"
 pom = "3.2.0"
