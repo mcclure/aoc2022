@@ -75,15 +75,15 @@ fn main() -> Result<(), Error> {
 		packets.push(Node::List(vec![Node::List(vec![Node::Num(2)])]));
 		packets.push(Node::List(vec![Node::List(vec![Node::Num(6)])]));
 
-		fn compare(a:Node, b:Node) -> Ordering {
+		fn compare(a:&Node, b:&Node) -> Ordering {
 			match (a,b) {
-				(Node::Num(a), Node::Num(b)) => {
+				(&Node::Num(a), &Node::Num(b)) => {
 					let cmp = a.cmp(&b);
 					cmp
 				},
-				(Node::List(a), Node::List(b)) => {
+				(&Node::List(ref a), &Node::List(ref b)) => {
 					for (a,b) in std::iter::zip(a.clone(),b.clone()) {
-						let cmp = compare(a,b);
+						let cmp = compare(&a,&b);
 						if cmp != Ordering::Equal {
 							return cmp
 						}
@@ -92,12 +92,12 @@ fn main() -> Result<(), Error> {
 					let cmp = a.len().cmp(&b.len());
 					cmp
 				},
-				(a@Node::Num(_), b@Node::List(_)) => compare(Node::List(vec![a]), b),
-				(a@Node::List(_), b@Node::Num(_)) => compare(a, Node::List(vec![b])),
+				(a@&Node::Num(_), b@&Node::List(_)) => compare(&Node::List(vec![a.clone()]), b),
+				(a@&Node::List(_), b@&Node::Num(_)) => compare(a, &Node::List(vec![b.clone()])),
 			}
 		}
 
-		packets.sort_by(|x, y|compare((*x).clone(),(*y).clone()));
+		packets.sort_by(compare);
 
 		for p in packets { println!("{:?}", p); }
 	}
