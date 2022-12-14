@@ -16,6 +16,7 @@ const DEBUG:bool = true;
 const DEBUG_FULL:bool = true;
 const DEBUG_FAILURE_ONLY:bool = false;
 const DEBUG_INLINE:bool = true;
+const DEBUG_REGURGITATE:bool = false;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if none) stdin
@@ -119,7 +120,7 @@ fn main() -> Result<(), Error> {
 								total += idx_at;
 							}
 
-							if DEBUG && !(DEBUG_FAILURE_ONLY && correct) {
+							{
 								fn printable_one_line(_l:Vec<Node>) -> bool {
 									false
 								/*	 // No good in two column mode.
@@ -130,9 +131,9 @@ fn main() -> Result<(), Error> {
 									}})
 									*/
 								}
-								fn debug_tree(n:Node, depth:i64) -> String {
+								fn debug_tree(n:Node, depth:i64, spaces:bool) -> String {
 									let mut s:String = "".to_string();
-									for _ in 0..depth { s += "    " }
+									if spaces { for _ in 0..depth { s += "    " } }
 									match n {
 										Node::Num(n) => s += &format!("{}", n),
 										Node::List(l) => {
@@ -140,51 +141,59 @@ fn main() -> Result<(), Error> {
 											if printable_one_line(l.clone()) {
 												for (idx,i) in l.into_iter().enumerate() {
 													if idx>0 { s += ", " }
-													s += &debug_tree(i, -1);
+													s += &debug_tree(i, -1, spaces);
 												}
 											}  else {
 												for (idx,i) in l.into_iter().enumerate() {
-													s += if idx>0 { ", \n" } else { "\n" };
-													s += &debug_tree(i, depth+1);
+													if spaces {
+														s += if idx>0 { ", \n" } else { "\n" };
+													} else {
+														s += if idx>0 { "," } else { "" };
+													}
+													s += &debug_tree(i, depth+1, spaces);
 												}
 											}
 											s += "]";
 										}
 									}
-									if depth==0 { s += "" }
+									//if depth==0 { s += "" }
 									s
 								}
-
-								println!("COMPARE {}", idx_at);
-								if DEBUG_FULL {
-									let gray1 = Style::new().on(Fixed(236));
-									let gray2 = Style::new().on(Fixed(237));
-
-									let left = debug_tree((*last_node).clone(), 0);
-									let right = debug_tree(node, 0);
-									fn str_width(s:&str) -> usize { // Width of longest line in s
-										let mut x = 0;
-										for line in s.lines() {
-											x = max(x, line.len());
-										}
-										x
-									}
-									let left_width = str_width(&left);
-									let right_width = str_width(&right);
-									for x in left.lines().zip_longest(right.lines()) {
-										let (left, right) = match x {
-											EitherOrBoth::Both(left, right) => (left, right),
-											EitherOrBoth::Left(left) => (left, ""),
-											EitherOrBoth::Right(right) => ("", right)
-										};
-										println!("{}{}{}{}", gray1.paint(left), gray1.paint(" ".repeat(left_width - left.len())),
-											gray2.paint(right), gray2.paint(" ".repeat(right_width - right.len())));
-									}
-									println!("{}{}", gray1.paint(" ".repeat(left_width)), gray2.paint(" ".repeat(right_width)));
+								if DEBUG_REGURGITATE {
+									print!("{}\n{}\n\n", debug_tree((*last_node).clone(), 0, false), debug_tree(node.clone(), 0, false));
 								}
-								println!("{} ({:?})\n", if correct {Style::new().paint("*** YES")} else {Style::new().fg(Black).on(Fixed(9)).paint("    NO ")}, cmp);
-							} else if DEBUG_INLINE { println!("") }
+								if DEBUG && !(DEBUG_FAILURE_ONLY && correct) {
+									println!("COMPARE {}", idx_at);
+									
+									if DEBUG_FULL {
+										let gray1 = Style::new().on(Fixed(236));
+										let gray2 = Style::new().on(Fixed(237));
 
+										let left = debug_tree((*last_node).clone(), 0, true);
+										let right = debug_tree(node, 0, true);
+										fn str_width(s:&str) -> usize { // Width of longest line in s
+											let mut x = 0;
+											for line in s.lines() {
+												x = max(x, line.len());
+											}
+											x
+										}
+										let left_width = str_width(&left);
+										let right_width = str_width(&right);
+										for x in left.lines().zip_longest(right.lines()) {
+											let (left, right) = match x {
+												EitherOrBoth::Both(left, right) => (left, right),
+												EitherOrBoth::Left(left) => (left, ""),
+												EitherOrBoth::Right(right) => ("", right)
+											};
+											println!("{}{}{}{}", gray1.paint(left), gray1.paint(" ".repeat(left_width - left.len())),
+												gray2.paint(right), gray2.paint(" ".repeat(right_width - right.len())));
+										}
+										println!("{}{}", gray1.paint(" ".repeat(left_width)), gray2.paint(" ".repeat(right_width)));
+									}
+									println!("{} ({:?})\n", if correct {Style::new().paint("*** YES")} else {Style::new().fg(Black).on(Fixed(9)).paint("    NO ")}, cmp);
+								} else if DEBUG_INLINE { println!("") }
+							}
 
 							idx_at += 1;
 							last = None;
