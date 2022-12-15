@@ -1,4 +1,4 @@
-// Summary
+// Recommend running in release mode
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
@@ -8,12 +8,13 @@ use glam::IVec2;
 use std::collections::HashSet;
 use range_set::RangeSet;
 
-const DEBUG_VERBOSE:bool = true;
+const DEBUG_VERBOSE:bool = false;
+const DEBUG_PROGRESS:bool = false;
 
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
 	let filename = args.nth(1);
-	let target_y = {
+	let cap = {
 		let invalid_target = || { Error::new(ErrorKind::InvalidInput, "Argument 2 must be number") };
 		match args.next() {
 			None => return Err(invalid_target()),
@@ -21,7 +22,7 @@ fn main() -> Result<(), Error> {
 		}?};
 
 	let mut sensors: Vec<(IVec2, i32)> = Default::default(); 
-	let mut line_beacons: HashSet<i32> = Default::default();
+	let mut beacons: HashSet<IVec2> = Default::default();
 
 	fn manhattan(v:IVec2) -> i32 { v.x.abs() + v.y.abs() }
 
@@ -78,51 +79,46 @@ fn main() -> Result<(), Error> {
 					if DEBUG_VERBOSE {
 						println!("sensor {}, beacon {} diff {}", sensor, beacon, sensor-beacon);
 					}
-					if target_y == beacon.y {
-						line_beacons.insert(beacon.x);
-					}
+					beacons.insert(beacon);
 					sensors.push((sensor, manhattan(sensor-beacon)));
 				}
 			}
 		}
 	}
 
-	let excluded = { // Scan target line
-		let mut excluded: RangeSet<[RangeInclusive <i32>; 20]> = RangeSet::new();
+	let cap_range:RangeInclusive<i32> = 0..=cap;
+	let mut cap_range_set: RangeSet<[RangeInclusive<i32>;20]> = RangeSet::new();
+	cap_range_set.insert_range(cap_range.clone());
+	for target_y in cap_range.clone() {
+		let mut excluded = { // Scan target line
+			let mut excluded: RangeSet<[RangeInclusive <i32>; 20]> = RangeSet::new();
 
-		for (sensor, strength) in sensors.iter() {
-			let depth = (target_y - sensor.y).abs();
-			let align = sensor.x;
-			let span = strength - depth;
-			if DEBUG_VERBOSE {
-				println!("--\n{:?}, {}", sensor, strength);
-				println!("depth: |{} - {}| = {}", target_y, sensor.y, depth);
-				println!("span: {} - {} = {}", strength, depth, span);
+			for (sensor, strength) in sensors.iter() {
+				let depth = (target_y - sensor.y).abs();
+				let align = sensor.x;
+				let span = strength - depth;
+				if span < 0 { continue }
+				else {
+					let range = (align-span)..=(align+span);
+					excluded.insert_range(range);
+				}
 			}
-			if span < 0 { continue }
-			else {
-				let range = (align-span)..=(align+span);
-				println!("Insert {:?}", range);
-				excluded.insert_range(range);
+
+			excluded
+		};
+
+		if let Some(intersect) = excluded.insert_range(cap_range.clone()) {
+			if intersect != cap_range_set {
+				println!("y={}: {:?}", target_y, intersect);
+			} else {
+				if DEBUG_PROGRESS && target_y%100000 == 0 {
+					println!("...{}...", target_y);
+				}
 			}
+		} else {
+			println!("???: y={}", target_y);
 		}
-
-		excluded
-	};
-
-	println!("{:?}", excluded);
-
-	// Total ranges
-	let mut total: i32 = 0;
-	for range in excluded.as_ref().iter() {
-		if DEBUG_VERBOSE { println!(": {:?}", range); }
-		let (lo,hi) = range.clone().into_inner();
-		total += hi-lo + 1; // +1 because inclusive
 	}
-
-	if DEBUG_VERBOSE { println!("{} - {}", total, line_beacons.len())}
-
-	println!("{}", total - line_beacons.len() as i32);
 
 	Ok(())
 }
