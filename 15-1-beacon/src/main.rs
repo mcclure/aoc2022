@@ -2,17 +2,25 @@
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
+use std::ops::RangeInclusive;
 use either::Either;
 use glam::IVec2;
+use range_set::RangeSet;
+
+const DEBUG_VERBOSE:bool = true;
 
 fn main() -> Result<(), Error> {
-	let mut beacons: Vec<(IVec2, IVec2)> = Default::default(); 
+	let mut args = std::env::args().fuse();
+	let mut sensors: Vec<(IVec2, i32)> = Default::default(); 
+
+	fn manhattan(v:IVec2) -> i32 { v.x.abs() + v.y.abs() }
 
 	{
 	    // Load file from command-line argument or (if none) stdin
-		let filename = std::env::args().fuse().nth(1);
-		let input: Either<BufReader<Stdin>, BufReader<File>> = match &filename {
-			None => either::Left(BufReader::new(stdin())),
+	    let filename = args.nth(1);
+		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
+			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
+			Some("-") => either::Left(BufReader::new(stdin())),
 			Some(x) => either::Right(BufReader::new(std::fs::File::open(x)?))
 		};
 
@@ -27,7 +35,7 @@ fn main() -> Result<(), Error> {
 
 		fn integer<'a>() -> Parser<'a, u8, i32> {
 			(sym(b'-').opt().map(|x|x.is_none()) + positive()).map(|(n,u)|
-				if n {-u} else {u})
+				if n {u} else {-u}) // n for None
 		}
 
 		fn whitespace<'a>() -> Parser<'a, u8, ()> {
@@ -58,14 +66,55 @@ fn main() -> Result<(), Error> {
 			match parsed {
 				Err(_) => return invalid(line),
 				Ok((sensor, beacon)) => {
-					beacons.push((beacon, sensor-beacon));
+					if DEBUG_VERBOSE {
+						println!("sensor {}, beacon {} diff {}", sensor, beacon, sensor-beacon);
+					}
+					sensors.push((sensor, manhattan(sensor-beacon)));
 				}
 			}
 		}
 	}
 
-	// Final score
-	println!("{:?}", beacons);
+	let excluded = { // Scan target line
+		let invalid_target = || { Error::new(ErrorKind::InvalidInput, "Argument 2 must be number") };
+		let target_y = match args.next() {
+			None => return Err(invalid_target()),
+			Some(x) => x.parse::<i32>().map_err(|_|invalid_target())
+		}?;
+
+		let mut excluded: RangeSet<[RangeInclusive <i32>; 20]> = RangeSet::new();
+
+		for (sensor, strength) in sensors.iter() {
+			let depth = (target_y - sensor.y).abs();
+			let align = sensor.x;
+			let span = strength - depth;
+			if DEBUG_VERBOSE {
+				println!("--\n{:?}, {}", sensor, strength);
+				println!("depth: |{} - {}| = {}", target_y, sensor.y, depth);
+				println!("span: {} - {} = {}", strength, depth, span);
+			}
+			if span < 0 { continue }
+			else {
+				let range = (align-span)..=(align+span);
+				println!("Insert {:?}", range);
+				excluded.insert_range(range);
+			}
+		}
+
+		excluded
+	};
+
+	println!("{:?}", excluded);
+
+	// Total ranges
+	let mut total: i32 = 0;
+	for range in excluded.as_ref().iter() {
+		if DEBUG_VERBOSE { println!(": {:?}", range); }
+		let (lo,hi) = range.clone().into_inner();
+		total += hi-lo;
+	}
+
+	println!("{}", excluded.iter().collect::<Vec<i32>>().len());
 
 	Ok(())
 }
