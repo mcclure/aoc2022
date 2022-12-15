@@ -2,9 +2,8 @@
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
-use std::cmp::{Ordering, max};
+use std::cmp::Ordering;
 use either::Either;
-use itertools::{EitherOrBoth, Itertools};
 
 #[derive(Debug, Clone)]
 enum Node {
@@ -12,7 +11,8 @@ enum Node {
 	List(Vec<Node>)
 }
 
-const DEBUG:bool = true;
+//const DEBUG:bool = true;
+const DEBUG_SORT:bool = true;
 
 fn main() -> Result<(), Error> {
 	let mut packets: Vec<Node> = Default::default();
@@ -54,9 +54,7 @@ fn main() -> Result<(), Error> {
 			) - whitespace() - sym(b']')
 		}
 
-		let mut last: Option<Node> = Default::default();
-		let mut idx_at = 1; // 1-index
-
+		// Iterate
 		for line in lines {
 			let line = line?;
 			let line = line.trim();
@@ -99,7 +97,26 @@ fn main() -> Result<(), Error> {
 
 		packets.sort_by(compare);
 
-		for p in packets { println!("{:?}", p); }
+		if DEBUG_SORT {
+			fn debug_tree(n:Node) -> String {
+				let mut s:String = "".to_string();
+				match n {
+					Node::Num(n) => s += &format!("{}", n),
+					Node::List(l) => {
+						s += "[";
+						for (idx,i) in l.into_iter().enumerate() {
+							s += if idx>0 { "," } else { "" };
+							s += &debug_tree(i);
+						}
+						s += "]";
+					}
+				}
+				s
+			}
+
+			// Eyeball it and look for 2, 6
+			for (idx, p) in packets.into_iter().enumerate() { println!("{}: {}", idx+1, debug_tree(p)); }
+		}
 	}
 
 	// Final score
