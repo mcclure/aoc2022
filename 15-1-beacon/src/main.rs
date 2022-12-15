@@ -5,19 +5,28 @@ use std::fs::File;
 use std::ops::RangeInclusive;
 use either::Either;
 use glam::IVec2;
+use std::collections::HashSet;
 use range_set::RangeSet;
 
 const DEBUG_VERBOSE:bool = true;
 
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
+	let filename = args.nth(1);
+	let target_y = {
+		let invalid_target = || { Error::new(ErrorKind::InvalidInput, "Argument 2 must be number") };
+		match args.next() {
+			None => return Err(invalid_target()),
+			Some(x) => x.parse::<i32>().map_err(|_|invalid_target())
+		}?};
+
 	let mut sensors: Vec<(IVec2, i32)> = Default::default(); 
+	let mut line_beacons: HashSet<i32> = Default::default();
 
 	fn manhattan(v:IVec2) -> i32 { v.x.abs() + v.y.abs() }
 
 	{
 	    // Load file from command-line argument or (if none) stdin
-	    let filename = args.nth(1);
 		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
 			Some("-") => either::Left(BufReader::new(stdin())),
@@ -69,6 +78,9 @@ fn main() -> Result<(), Error> {
 					if DEBUG_VERBOSE {
 						println!("sensor {}, beacon {} diff {}", sensor, beacon, sensor-beacon);
 					}
+					if target_y == beacon.y {
+						line_beacons.insert(beacon.x);
+					}
 					sensors.push((sensor, manhattan(sensor-beacon)));
 				}
 			}
@@ -76,12 +88,6 @@ fn main() -> Result<(), Error> {
 	}
 
 	let excluded = { // Scan target line
-		let invalid_target = || { Error::new(ErrorKind::InvalidInput, "Argument 2 must be number") };
-		let target_y = match args.next() {
-			None => return Err(invalid_target()),
-			Some(x) => x.parse::<i32>().map_err(|_|invalid_target())
-		}?;
-
 		let mut excluded: RangeSet<[RangeInclusive <i32>; 20]> = RangeSet::new();
 
 		for (sensor, strength) in sensors.iter() {
@@ -111,10 +117,12 @@ fn main() -> Result<(), Error> {
 	for range in excluded.as_ref().iter() {
 		if DEBUG_VERBOSE { println!(": {:?}", range); }
 		let (lo,hi) = range.clone().into_inner();
-		total += hi-lo;
+		total += hi-lo + 1;
 	}
 
-	println!("{}", excluded.iter().collect::<Vec<i32>>().len());
+	if DEBUG_VERBOSE { println!("{} - {}", total, line_beacons.len())}
+
+	println!("{}", total - line_beacons.len() as i32);
 
 	Ok(())
 }
