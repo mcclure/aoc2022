@@ -5,10 +5,10 @@ use std::fs::File;
 use either::Either;
 
 fn main() -> Result<(), Error> {
-    // Load file from command-line argument or (if none) stdin
-	let filename = std::env::args().fuse().nth(1);
-	let input: Either<BufReader<Stdin>, BufReader<File>> = match &filename {
-		None => either::Left(BufReader::new(stdin())),
+    // Load file from command-line argument or (if -) stdin
+	let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
+		None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
+		Some("-") => either::Left(BufReader::new(stdin())),
 		Some(x) => either::Right(BufReader::new(std::fs::File::open(x)?))
 	};
 
