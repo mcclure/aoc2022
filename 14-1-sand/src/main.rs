@@ -8,11 +8,17 @@ use glam::IVec2;
 
 #[derive(Copy,Clone)]
 enum Cell {
-	Wall
+	Wall,
+	Sand,
+	End
 }
+
+const DEBUG_INITIAL:bool = true;
+const DEBUG_RUNNING:bool = true;
 
 fn main() -> Result<(), Error> {
 	let origin:IVec2 = IVec2::new(500,0);
+	let mut active_sand:IVec2 = origin;
 	let mut min:IVec2 = origin;
 	let mut max:IVec2 = origin;
 	let mut board: HashMap<IVec2, Cell> = Default::default();
@@ -98,16 +104,19 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
-	fn board_debug(board:&HashMap<IVec2, Cell>, min:&IVec2, max:&IVec2, origin:IVec2) {
+	fn board_debug(board:&HashMap<IVec2, Cell>, min:&IVec2, max:&IVec2, origin:IVec2, active_sand:IVec2) {
 		println!("{} ... {}", min, max);
 		for y in min.y..=max.y {
 			for x in min.x..=max.x {
 				let at = IVec2::new(x,y);
 				print!("{}",
 					if at == origin { "+" }
+					else if at == active_sand { "○" }
 					else if let Some(c) = board.get(&at) {
 						match c {
 							Cell::Wall => "█",
+							Cell::Sand => "●",
+							Cell::End => "!"
 						}
 					} else { "·" }
 				)
@@ -119,10 +128,57 @@ fn main() -> Result<(), Error> {
 
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
-	board_debug(&board, &min, &max, origin);
+	if DEBUG_INITIAL {
+		if DEBUG_RUNNING { print!("\x1B[2J\x1B[1;1H"); }
+		board_debug(&board, &min, &max, origin, active_sand);
+	}
+
+	// 1 step
+	let movements = vec!(Some(IVec2::new(0,1)), Some(IVec2::new(-1,1)),
+		                 Some(IVec2::new(1,1)), None);
+	let mut total = 1;
+
+	loop {
+		let mut spawned = false;
+		let mut ended = false;
+
+		for movement in movements.iter() {
+			match *movement {
+				Some(v) => {
+					let next = active_sand + v;
+					if !board.contains_key(&next) {
+						active_sand = next;
+						break
+					}
+				},
+				None => {
+					spawned = true;
+					add(&mut board, &mut min, &mut max, active_sand, Cell::Sand);
+					active_sand = origin;
+					total = total + 1;
+				}
+			}
+		}
+
+		if active_sand.y > max.y {
+			add(&mut board, &mut min, &mut max, active_sand, Cell::End);
+			ended = true;
+		}
+
+		if DEBUG_RUNNING {
+			print!("\x1B[2J\x1B[1;1H");
+			board_debug(&board, &min, &max, origin, active_sand);
+			if spawned { print!("SPAWNED!"); }
+		}
+
+		if ended {
+			if DEBUG_RUNNING { println!("ENDED!"); }
+			break
+		}
+	}
 
 	// Final score
-	//println!("{}", total);
+	println!("{}", total);
 
 	Ok(())
 }
