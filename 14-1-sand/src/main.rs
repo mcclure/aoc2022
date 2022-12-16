@@ -15,6 +15,7 @@ enum Cell {
 
 const DEBUG_INITIAL:bool = true;
 const DEBUG_RUNNING:bool = true;
+const DEBUG_RUNNING_SLEEP:bool = true;
 
 fn main() -> Result<(), Error> {
 	let origin:IVec2 = IVec2::new(500,0);
@@ -99,6 +100,7 @@ fn main() -> Result<(), Error> {
 							at += step;
 						} 
 					}
+					add(&mut board, &mut min, &mut max, *x.last().unwrap(), Cell::Wall);
 				}
 			}
 		}
@@ -136,7 +138,7 @@ fn main() -> Result<(), Error> {
 	// 1 step
 	let movements = vec!(Some(IVec2::new(0,1)), Some(IVec2::new(-1,1)),
 		                 Some(IVec2::new(1,1)), None);
-	let mut total = 1;
+	let mut total = 0;
 
 	loop {
 		let mut spawned = false;
@@ -169,10 +171,12 @@ fn main() -> Result<(), Error> {
 			print!("\x1B[2J\x1B[1;1H");
 			board_debug(&board, &min, &max, origin, active_sand);
 			if spawned { print!("SPAWNED!"); }
+			if ended { println!("ENDED!"); }
+			if DEBUG_RUNNING_SLEEP { std::thread::sleep(
+				std::time::Duration::new(0, 1_000_000_000/60)) }
 		}
 
 		if ended {
-			if DEBUG_RUNNING { println!("ENDED!"); }
 			break
 		}
 	}
