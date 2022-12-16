@@ -6,6 +6,7 @@ use either::Either;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
+	let filename = std::env::args().fuse().nth(1);
 	let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 		None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
 		Some("-") => either::Left(BufReader::new(stdin())),
