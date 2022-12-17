@@ -4,11 +4,15 @@ use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
 use std::collections::HashMap;
 use std::cmp::Ordering;
+use std::fmt::Write;
 use either::Either;
 use petgraph::graph::{NodeIndex, UnGraph};
 use itertools::Itertools;
 
 type Weight = i32;
+
+const TIME_LIMIT:Weight = 30;
+const START_NAME: &str = "AA";
 
 fn main() -> Result<(), Error> {
 	let (start, start_weight, goals, graph) = {
@@ -84,7 +88,9 @@ fn main() -> Result<(), Error> {
 				Ok(((name, weight), connections)) => {
 					let name = name.to_string();
 					let node = graph.add_node((name.clone(), weight));
-					if start.is_none() { start = Some((node, weight)) }
+					if start.is_none() && name == START_NAME {
+						start = Some((node, weight))
+					}
 					else if weight>0 { goals.push(node) }
 					connect.push((node, connections.into_iter().map(|x|x.to_string()).collect()));
 					names.insert(name, node);
@@ -103,21 +109,37 @@ fn main() -> Result<(), Error> {
 	};
 
 	// Path, time, weight
-	let mut paths : Vec<(Vec<&NodeIndex>, Weight, Weight)> = Default::default();
+	let mut paths : Vec<(Vec<(String, Weight)>, Weight, Weight)> = Default::default();
 	{
+		let start_weighty = start_weight > 0;
 		for n in 0..goals.len() {
 			for mut path in goals.iter().permutations(n) {
 				path.insert(0, &start);
 				//println!("{:?}",p);
-				let mut time = if start_weight > 0 { 1 } else { 0 }; // Switch at start
-				let mut weight = start_weight;
+				let mut time = if start_weighty { 1 } else { 0 }; // Switch at start
+				let mut total_weight = start_weight;
+				let mut names: Vec<(String, Weight)> = vec![(START_NAME.to_string(), 0)];
+				let mut timeout = false;
 				for v in path.windows(2) {
 					let (&from, &to) = (v[0], v[1]);
 					let dijk = petgraph::algo::dijkstra::dijkstra(&graph, from, Some(to), |_|1);
-					for time_cost in dijk.values() { time += time_cost + 1 }
-					weight += graph[to].1;
+					let time_cost = dijk[&to];
+
+					time += time_cost; // Always 1?
+					let (name, weight) = &graph[to];
+					names.push((name.to_string(), time));
+					if true { // "if to"
+						time += 1;
+						if time > TIME_LIMIT {
+							timeout = true; break
+						} else {
+							total_weight += weight * (TIME_LIMIT-time+1);	
+						}
+					}
 				}
-				paths.push((path, time, weight));
+				if !timeout {
+					paths.push((names, time, total_weight));
+				}
 			}
 		}
 	}
@@ -126,8 +148,25 @@ fn main() -> Result<(), Error> {
 		Ordering::Equal => a.1.cmp(&b.1), x => x
 	} );
 
-	for (v, time, weight) in paths {
-		println!("---\n{}: {} -- {:?}", time, weight, v);
+	fn format_names(names: Vec<(String, Weight)>) -> String {
+		let mut s:String = "[".to_string();
+		for (n,(name, time)) in names.iter().enumerate() {
+			if n>0 { s += ", " }
+			write!(s, "{}:{}", time, name).unwrap();
+		}
+		s += "]";
+		return s;
+	}
+
+	{
+		use ansi_term::Style;
+		use ansi_term::Colour::{Black, White, Yellow};
+		let invert = Style::new().fg(Black).on(White);
+		let inverty = Style::new().fg(Black).on(Yellow);
+
+		for (names, time, weight) in paths {
+			println!("---\n{}, {}: {}", invert.paint(time.to_string()), inverty.paint(weight.to_string()), format_names(names));
+		}
 	}
 
 	// Final score
