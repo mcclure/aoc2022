@@ -1,4 +1,4 @@
-// Travelling salesman program but weird
+// Travelling salesman program but weird alo there's an elephant
 // Second argument is printout debug
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
@@ -13,7 +13,7 @@ use itertools::Itertools;
 type Weight = i32;
 type Time = Weight;
 
-const TIME_LIMIT:Time = 30;
+const TIME_LIMIT:Time = 26;
 const START_NAME: &str = "AA";
 
 fn main() -> Result<(), Error> {
@@ -132,7 +132,9 @@ fn main() -> Result<(), Error> {
 		None => None
 	};
 
-	fn format_names(names: Vec<(String, Time, Weight)>) -> String {
+	type Player = usize;
+
+	fn format_names(names: Vec<(String, Time, Player)>) -> String {
 		let mut s:String = "[".to_string();
 		for (n,(name, time, weight)) in names.iter().enumerate() {
 			if n>0 { s += ", " }
@@ -149,49 +151,58 @@ fn main() -> Result<(), Error> {
 		let invert = Style::new().fg(Black).on(White);
 		let inverty = Style::new().fg(Black).on(Yellow);
 
-		// Note first Vec can lose time and weight in non-debug scenario		
-		type NextPaths = Vec<(Vec<(String, Time, Weight)>, Vec<bool>, NodeIndex, Time, Weight)>;
-		let mut paths: NextPaths = vec![(
+		// Note first Vec can lose time and weight in non-debug scenario
+		type PathHistory = Vec<(String, Time, Weight)>;
+		const PLAYERS:usize = 2;
+		type NextPaths = Vec<(Vec<(String, Time, Player)>, Vec<bool>, [NodeIndex; PLAYERS], [Time; PLAYERS], Weight)>;
+		let mut paths: [NextPaths; TIME_LIMIT as usize] = Default::default();
+		paths[0].push((
 				vec![(START_NAME.to_string(), 0, 0)],
 				goals.iter().map(|_|false).collect(),
-				start, 0, 0)];
-		let (mut checked, mut timed_out, mut useless, mut best_weight) = (0,0,0,0); 
-		while paths.len() > 0 {
-			let mut next_paths: NextPaths = Default::default();
+				[start, start], [0,0], 0
+		));
+		let (mut checked, mut timed_out, mut useless, mut best_weight) = (0,0,0,0);
+		for t in 0..(TIME_LIMIT as usize) {
+			while paths[t].len() > 0 {
+				let mut pass_paths = std::mem::take(&mut paths[t]);
 
-			for path in paths {
-				for (goal_idx, &goal) in goals.iter().enumerate() {
-					if path.1[goal_idx] { continue } // "visited" but don't clone
-					let (mut history, mut visited, at, mut time, mut weight) = path.clone();
+				for path in pass_paths {
+					for (goal_idx, &goal) in goals.iter().enumerate() {
+						if path.1[goal_idx] { continue } // "visited" but don't clone
+						let (mut history, mut visited, mut at, mut time, mut weight) = path.clone();
 
-					time += routes[&(at, goal)];
+						let player:Player = if time[1] < time[0] { 1 } else { 0 }; 
 
-					if time+1 >= TIME_LIMIT { timed_out += 1; continue } // > OR >= ??
+						time[player] += routes[&(at[player], goal)];
 
-					let (name, goal_weight) = &graph[goal];
+						if time[player]+1 >= TIME_LIMIT { timed_out += 1; continue } // > OR >= ??
 
-					history.push((name.clone(), weight, time));
-//println!("?? {}: {} {} ({})", name.clone(), time, TIME_LIMIT-time, goal_weight * (TIME_LIMIT-time));
-					weight += goal_weight * (TIME_LIMIT-time-1); // I DON'T UNDERSTAND WHY -1
-					time += 1;
-					visited[goal_idx] = true;
-					checked += 1;
-					if weight > best_weight {
-						best_weight = weight;
-						println!("---\n{}, {}: {}", invert.paint(time.to_string()), inverty.paint(weight.to_string()), format_names(history.clone()));
-					} else {
-						useless += 1;
-					}
-					match report_progress { None => {},
-						Some(report_progress) => if checked % report_progress == 0 {
-							println!("checked {}, skipped {}, timeout {}", checked, useless, timed_out);
+						let next_time = time[if time[1] < time[0] { 1 } else { 0 }] as usize;
+
+						let (name, goal_weight) = &graph[goal];
+
+						history.push((name.clone(), time[player], player));
+	//println!("?? {}: {} {} ({})", name.clone(), time, TIME_LIMIT-time, goal_weight * (TIME_LIMIT-time));
+						weight += goal_weight * (TIME_LIMIT-time[player]-1); // I DON'T UNDERSTAND WHY -1
+						time[player] += 1;
+						visited[goal_idx] = true;
+						checked += 1;
+						if weight > best_weight {
+							best_weight = weight;
+							println!("---\n{}. {}, {}: {}", player, invert.paint(time[player].to_string()), inverty.paint(weight.to_string()), format_names(history.clone()));
+						} else {
+							useless += 1;
 						}
+						match report_progress { None => {},
+							Some(report_progress) => if checked % report_progress == 0 {
+								println!("checked {}, skipped {}, timeout {}", checked, useless, timed_out);
+							}
+						}
+						at[player] = goal;
+						paths[next_time].push((history, visited, at, time, weight));
 					}
-					next_paths.push((history, visited, goal, time, weight));
 				}
 			}
-
-			paths = next_paths;
 		}
 	}
 
