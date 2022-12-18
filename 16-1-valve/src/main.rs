@@ -1,8 +1,8 @@
-// Summary
+// Travelling salesman program but weird
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::cmp::Ordering;
 use std::fmt::Write;
 use either::Either;
@@ -10,14 +10,17 @@ use petgraph::graph::{NodeIndex, UnGraph};
 use itertools::Itertools;
 
 type Weight = i32;
+type Time = Weight;
 
-const TIME_LIMIT:Weight = 30;
+const TIME_LIMIT:Time = 30;
 const START_NAME: &str = "AA";
 
 fn main() -> Result<(), Error> {
+	let mut args = std::env::args().fuse();
+	let filename = args.nth(1);
+
 	let (start, start_weight, goals, graph) = {
 	    // Load file from command-line argument or (if -) stdin
-		let filename = std::env::args().fuse().nth(1);
 		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
 			Some("-") => either::Left(BufReader::new(stdin())),
@@ -25,8 +28,6 @@ fn main() -> Result<(), Error> {
 		};
 
 		let lines = input.lines();
-
-		let mut total: i64 = 0;
 
 		use pom::parser::*;
 
@@ -108,9 +109,97 @@ fn main() -> Result<(), Error> {
 		}
 	};
 
+	let routes = {
+		let mut routes: HashMap<(NodeIndex, NodeIndex), Time> = Default::default();
+		let mut origins = goals.clone();
+		origins.insert(0, start);
+		let mut is_goal: HashSet<NodeIndex> = Default::default();
+		for &goal in goals.iter() { is_goal.insert(goal); };
+		for origin in origins {
+			let dijk = petgraph::algo::dijkstra::dijkstra(&graph, origin, None, |_|1);
+			for (destination, time) in dijk {
+				if is_goal.contains(&destination) {
+					routes.insert((origin, destination), time);
+				}
+			}
+		}
+		routes
+	};
+
+	let report_progress = match args.next() {
+		Some(x) => Some(x.parse::<u64>().map_err(|_|Error::new(ErrorKind::InvalidInput, "Argument 2 must be number"))?),
+		None => None
+	};
+
+	fn format_names(names: Vec<(String, Time, Weight)>) -> String {
+		let mut s:String = "[".to_string();
+		for (n,(name, time, weight)) in names.iter().enumerate() {
+			if n>0 { s += ", " }
+			write!(s, "{}[{},{}]", name, time, weight).unwrap();
+		}
+		s += "]";
+		return s;
+	}
+
 	// Path, time, weight
-	let mut paths : Vec<(Vec<(String, Weight)>, Weight, Weight)> = Default::default();
 	{
+		use ansi_term::Style;
+		use ansi_term::Colour::{Black, White, Yellow};
+		let invert = Style::new().fg(Black).on(White);
+		let inverty = Style::new().fg(Black).on(Yellow);
+
+		// Note first Vec can lose time and weight in non-debug scenario		
+		type NextPaths = Vec<(Vec<(String, Time, Weight)>, Vec<bool>, NodeIndex, Time, Weight)>;
+		let mut paths: NextPaths = vec![(
+				vec![(START_NAME.to_string(), 0, 0)],
+				goals.iter().map(|_|false).collect(),
+				start, 0, 0)];
+		let (mut checked, mut timed_out, mut useless, mut best_weight) = (0,0,0,0); 
+		while paths.len() > 0 {
+			let mut next_paths: NextPaths = Default::default();
+
+			for path in paths {
+				for (goal_idx, &goal) in goals.iter().enumerate() {
+					if path.1[goal_idx] { continue } // "visited" but don't clone
+					let (mut history, mut visited, at, mut time, mut weight) = path.clone();
+
+					time += routes[&(at, goal)];
+
+					if time+1 >= TIME_LIMIT { timed_out += 1; continue } // > OR >= ??
+
+					let (name, goal_weight) = &graph[goal];
+
+					history.push((name.clone(), weight, time));
+//println!("?? {}: {} {} ({})", name.clone(), time, TIME_LIMIT-time, goal_weight * (TIME_LIMIT-time));
+					weight += goal_weight * (TIME_LIMIT-time-1); // I DON'T UNDERSTAND WHY -1
+					time += 1;
+					visited[goal_idx] = true;
+					checked += 1;
+					if weight > best_weight {
+						best_weight = weight;
+						println!("---\n{}, {}: {}", invert.paint(time.to_string()), inverty.paint(weight.to_string()), format_names(history.clone()));
+					} else {
+						useless += 1;
+					}
+					match report_progress { None => {},
+						Some(report_progress) => if checked % report_progress == 0 {
+							println!("checked {}, skipped {}, timeout {}", checked, useless, timed_out);
+						}
+					}
+					next_paths.push((history, visited, goal, time, weight));
+				}
+			}
+
+			paths = next_paths;
+		}
+	}
+/*
+	{
+		let mut paths : Vec<(Vec<(String, Weight)>, Time, Weight)> = Default::default();
+
+
+		let mut paths : Vec<(Vec<(String, Weight)>, Time, Weight)> = Default::default();
+
 		let start_weighty = start_weight > 0;
 		for n in 0..goals.len() {
 			for mut path in goals.iter().permutations(n) {
@@ -148,7 +237,7 @@ fn main() -> Result<(), Error> {
 		Ordering::Equal => a.1.cmp(&b.1), x => x
 	} );
 
-	fn format_names(names: Vec<(String, Weight)>) -> String {
+	fn format_names(names: Vec<(String, Time)>) -> String {
 		let mut s:String = "[".to_string();
 		for (n,(name, time)) in names.iter().enumerate() {
 			if n>0 { s += ", " }
@@ -170,6 +259,6 @@ fn main() -> Result<(), Error> {
 	}
 
 	// Final score
-
+*/
 	Ok(())
 }
