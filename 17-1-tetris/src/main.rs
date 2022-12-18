@@ -32,6 +32,8 @@ const WIDTH:i32 = 7;
 const SPAWN_X:i32 = 2; // 2 from left wall
 const SPAWN_Y:i32 = 3; // 3 above highest point
 
+const DEBUG_VERBAL:bool = true;
+
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
 	let filename = std::env::args().fuse().nth(1);
@@ -92,17 +94,20 @@ fn main() -> Result<(), Error> {
 		let mino = &minos[mino_at];
 		if at.is_none() { // New piece
 			at = Some(IVec2::new(SPAWN_X, max + SPAWN_Y + mino_heights[mino_at]));
+			if DEBUG_VERBAL { println!("New piece {} at {:?}", mino_at, at) }
 		}
 		match at {
 			Some(at_unwrap) => {
 				let right = ctrl[t % ctrl.len()];
 				let mut try_move = |v:IVec2, down:bool| {
 					let at_moved = at_unwrap + v;
+					if DEBUG_VERBAL { println!("Trying move to {}...", at_moved) }
 					for &cell in mino {
 						let at_cell = at_moved + cell;
 						if at_cell.x < 0 || at_cell.x >= WIDTH { return }
-						if board.contains(&at_cell) {
+						if at_cell.y < 0 || board.contains(&at_cell) {
 							if down {
+								if DEBUG_VERBAL { println!("...froze!") }
 								mino_at += 1;
 								mino_at %= minos.len();
 								for &cell in mino { // Shadow
@@ -116,6 +121,7 @@ fn main() -> Result<(), Error> {
 						}
 					}
 					at = Some(at_moved);
+					if DEBUG_VERBAL { println!("...success.") }
 				};
 				try_move(if right { IVec2::X } else { -IVec2::X }, false);
 				try_move(-IVec2::Y, true);
