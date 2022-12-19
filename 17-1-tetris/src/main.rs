@@ -8,6 +8,7 @@ use std::cmp;
 use either::Either;
 use glam::IVec2;
 
+// NOTICE YFLIP
 const MINO_SPEC: &str = "\
 ####
 
@@ -15,9 +16,9 @@ const MINO_SPEC: &str = "\
 ###
 .#.
 
-..#
-..#
 ###
+..#
+..#
 
 #
 #
@@ -29,11 +30,14 @@ const MINO_SPEC: &str = "\
 
 const SIMULATION_LENGTH:usize = 2022;
 const WIDTH:i32 = 7;
+
+// Note: Spawn point refers to the BOTTOM LEFT coordinate,
+// But "at" variable refers to TOP LEFT coordinate.
 const SPAWN_X:i32 = 2; // 2 from left wall
 const SPAWN_Y:i32 = 3; // 3 above highest point
 
-const DEBUG_VERBAL:bool = false;
-const DEBUG_FREEZE:bool = false;
+const DEBUG_VERBAL:bool = true;
+const DEBUG_FREEZE:bool = true;
 const DEBUG_FINAL:bool = true;
 
 fn main() -> Result<(), Error> {
@@ -114,7 +118,7 @@ fn main() -> Result<(), Error> {
 	for t in 0..simulation_length {
 		let mino = &minos[mino_at];
 		if at.is_none() { // New piece
-			at = Some(IVec2::new(SPAWN_X, max + SPAWN_Y + mino_heights[mino_at]));
+			at = Some(IVec2::new(SPAWN_X, max + SPAWN_Y));
 			if DEBUG_VERBAL { println!("New piece {} at {:?}", mino_at, at) }
 		}
 		match at {
@@ -122,10 +126,10 @@ fn main() -> Result<(), Error> {
 				let right = ctrl[t % ctrl.len()];
 				let mut try_move = |v:IVec2, down:bool| {
 					let at_moved = at_unwrap + v;
-					if DEBUG_VERBAL { println!("{:?} {:?} Trying move to {}...", v, at, at_moved) }
+					if DEBUG_VERBAL { println!("{:?}+{:?} Trying move to {}...", at, v, at_moved) }
 					for &cell in mino {
 						let at_cell = at_moved + cell;
-						if DEBUG_VERBAL { println!("Check x {} {} {} {}", at_cell.x, at_cell.x < 0, at_cell.x >= WIDTH, at_cell.x < 0 || at_cell.x >= WIDTH) }
+						//if DEBUG_VERBAL { println!("Check x {} {} {} {}", at_cell.x, at_cell.x < 0, at_cell.x >= WIDTH, at_cell.x < 0 || at_cell.x >= WIDTH) }
 						if at_cell.x < 0 || at_cell.x >= WIDTH { return }
 						if at_cell.y < 0 || board.contains(&at_cell) {
 							if down {
@@ -163,13 +167,13 @@ fn main() -> Result<(), Error> {
 		  || ((DEBUG_FINAL || !report_progress.is_none()) &&
 		  	  (t==(simulation_length-1) || match max_frozen { None => false, Some(max_frozen) => frozen == max_frozen })) {
 			println!("Height: {}", max);
-			for y in (0..=(match at { None => max, Some(at) => cmp::max(max, at.y) })).rev() {
+			for y in (0..=(match at { None => max, Some(at) => {println!("{}+{}",at.y,mino_heights[mino_at]);cmp::max(max, at.y+mino_heights[mino_at])} })).rev() {
 				print!("|");
 				for x in 0..WIDTH {
 					let check = IVec2::new(x,y);
 					print!("{}",
-						// if match at { None => false, Some(at) => check - at } else
-						if board.contains(&check) { '#' }
+						if match at { None => false, Some(at) => mino.contains(&(check - at))} { '@' }
+						else if board.contains(&check) { '#' }
 						else { '.' }
 					);
 				}
