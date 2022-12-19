@@ -28,7 +28,7 @@ const MINO_SPEC: &str = "\
 ##
 ##";
 
-const SIMULATION_LENGTH:usize = 2022;
+const MAX_FROZEN:usize = 2022;
 const WIDTH:i32 = 7;
 
 // Note: Spawn point refers to the BOTTOM LEFT coordinate,
@@ -101,15 +101,19 @@ fn main() -> Result<(), Error> {
 		None => None
 	} { Some(0) => None, x => x };
 
-	let simulation_length = match match args.next() {
+	let simulation_length = match args.next() {
 		Some(x) => Some(x.parse::<usize>().map_err(|_|Error::new(ErrorKind::InvalidInput, "Argument 3 must be positive number"))?),
 		None => None
-	} { None | Some(0) => SIMULATION_LENGTH, Some(x) => x };
+	};
 
-	let max_frozen = match args.next() {
+	let simulation_range = match simulation_length {
+		Some(x) => Either::Left(0..x), None => Either::Right(0..)
+	};
+
+	let max_frozen = match match args.next() {
 		Some(x) => Some(x.parse::<usize>().map_err(|_|Error::new(ErrorKind::InvalidInput, "Argument 4 must be positive number"))?),
 		None => None
-	};
+	} { Some(x) => x, None => MAX_FROZEN };
 
 	let mut board: HashSet<IVec2> = Default::default();
 	let mut watermark:i32 = 0;
@@ -117,7 +121,7 @@ fn main() -> Result<(), Error> {
 	let mut mino_at = 0;
 	let mut frozen = 0; // For debugging
 
-	for t in 0.. {
+	for t in simulation_range {
 		let mino = &minos[mino_at];
 		if at.is_none() { // New piece
 			at = Some(IVec2::new(SPAWN_X, watermark + SPAWN_Y));
@@ -165,7 +169,8 @@ fn main() -> Result<(), Error> {
 			Some(x) => 0 == t%x
 		} || (DEBUG_FREEZE && at.is_none())
 		  || ((DEBUG_FINAL || !report_progress.is_none()) &&
-		  	  (t==(simulation_length-1) || match max_frozen { None => false, Some(max_frozen) => frozen == max_frozen })) {
+		  	  (match simulation_length { None => false, Some(x) => t==(x-1) } 
+		  	   || frozen == max_frozen)) {
 			println!("Height: {}", watermark);
 			for y in (0..=(match at { None => watermark, Some(at) => {println!("{}+{}",at.y,mino_heights[mino_at]);cmp::max(watermark, at.y+mino_heights[mino_at])} })).rev() {
 				print!("|");
@@ -182,7 +187,7 @@ fn main() -> Result<(), Error> {
 			println!("");
 		}
 
-		match max_frozen { None => (), Some(max_frozen) => if frozen >= max_frozen { break } }
+		if frozen >= max_frozen { break }
 	}
 
 	// Final score
