@@ -116,16 +116,19 @@ fn main() -> Result<(), Error> {
 		blueprints
 	};
 
+	#[cfg(debug_assertions)]
 	#[derive(Debug)]
 	struct HistoryNode {
 		next: HistoryNodeRef,
 		cell:Cell,
 		at:Time
 	}
+	#[cfg(debug_assertions)]
 	type HistoryNodeRef = Option<Rc<RefCell<HistoryNode>>>;
 
 	// History, time, robot count, resource count, next
 	struct Consider {
+		#[cfg(debug_assertions)]
 		history:HistoryNodeRef,
 		time:Time,
 		robots:[Count;4],
@@ -135,12 +138,14 @@ fn main() -> Result<(), Error> {
 
 	impl fmt::Debug for Consider {
 	    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-	        f.debug_struct("Point")
+	        let mut f = f.debug_struct("Point");
+	        let mut f = f
 	         .field("time", &self.time)
 	         .field("robots", &self.robots)
 	         .field("cells", &self.cells)
-	         .field("want", &self.want)
-	         .field("history", &{
+	         .field("want", &self.want);
+	        #[cfg(debug_assertions)] {
+	        	f.field("history", &{
 	         	let mut s:String = "]".to_string();
 	         	let mut node = self.history.clone();
 	         	while !node.is_none() {
@@ -151,8 +156,9 @@ fn main() -> Result<(), Error> {
 	         	}
 	         	s = "[".to_string() + &s;
 	         	s
-	         })
-	         .finish()
+	         });
+	        }
+	        f.finish()
 	    }
 	}
 
@@ -191,7 +197,9 @@ fn main() -> Result<(), Error> {
 	for (idx,blueprint) in blueprints.iter().enumerate() {
 		let mut winning_consider: Option<Consider> = Default::default();
 
-		let mut next_considers = vec![Consider{history:None, time:0, robots:[1,0,0,0], cells:[0;4], want:None}];
+		let mut next_considers = vec![Consider{
+			#[cfg(debug_assertions)] history:None, 
+			time:0, robots:[1,0,0,0], cells:[0;4], want:None}];
 		while !next_considers.is_empty() {
 			let considers = std::mem::take(&mut next_considers);
 			for mut consider in considers {
@@ -203,7 +211,10 @@ fn main() -> Result<(), Error> {
 							for resource_idx in (0..4).rev() { // Check which robots can form currently
 								let ((_,cell1), cost2) = blueprint[resource_idx];
 								if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
-									need.push(Consider{want:Some(Cell::from_int(resource_idx as u8).unwrap()), history:consider.history.clone(), ..consider})
+									need.push(Consider{
+										want:Some(Cell::from_int(resource_idx as u8).unwrap()),
+										#[cfg(debug_assertions)] history:consider.history.clone(),
+										..consider})
 								}
 							}
 
@@ -228,7 +239,13 @@ fn main() -> Result<(), Error> {
 								robot_deplete(cost1, &mut consider.cells);
 								if let Some(cost) = cost2 { robot_deplete(cost, &mut consider.cells) }
 								consider.robots[want as usize] += 1;
-								consider.history = Some(Rc::new(RefCell::new(HistoryNode { cell:want, at:consider.time, next: consider.history.clone() })));
+								#[cfg(debug_assertions)] {
+									consider.history = Some(Rc::new(RefCell::new(HistoryNode 
+										{ cell:want, at:consider.time, 
+											#[cfg(debug_assertions)]
+											next: consider.history.clone()
+										})));
+								}
 								consider.want = None;
 							}
 
