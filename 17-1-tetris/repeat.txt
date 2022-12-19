@@ -1,0 +1,1 @@
+perl -e '($path, $a2) = @ARGV; $a1 = `wc -m $path`+0; $a = $a1; $b = 0; for (0..$a2) { $c = `target/release/tetris.exe $path 1 0 $a`+0; $d = $c-$b; print(",") if $a>$a1; print("$d"); $a += $a1; $b = $c; }' data/sample.txt 1000
