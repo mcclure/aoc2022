@@ -1,6 +1,7 @@
 // Summary
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
+use std::fmt;
 use std::fs::File;
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -124,13 +125,35 @@ fn main() -> Result<(), Error> {
 	type HistoryNodeRef = Option<Rc<RefCell<HistoryNode>>>;
 
 	// History, time, robot count, resource count, next
-	#[derive(Debug)]
 	struct Consider {
 		history:HistoryNodeRef,
 		time:Time,
 		robots:[Count;4],
 		cells:[Count;4],
 		want:Option<Cell>
+	}
+
+	impl fmt::Debug for Consider {
+	    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+	        f.debug_struct("Point")
+	         .field("time", &self.time)
+	         .field("robots", &self.robots)
+	         .field("cells", &self.cells)
+	         .field("want", &self.want)
+	         .field("history", &{
+	         	let mut s:String = "]".to_string();
+	         	let mut node = self.history.clone();
+	         	while !node.is_none() {
+	         		let n2 = node.unwrap();
+	         		let n2 = n2.borrow_mut();
+	         		s = format!("[{:?}@{}],{}", n2.cell, n2.at+1, s); // NOTICE TIME INCREMENT
+	         		node = n2.next.clone();
+	         	}
+	         	s = "[".to_string() + &s;
+	         	s
+	         })
+	         .finish()
+	    }
 	}
 
 	// id, geode count
@@ -177,7 +200,7 @@ fn main() -> Result<(), Error> {
 						None => {
 							// Branch
 							let mut need:Vec<Consider> = Default::default();
-							for resource_idx in (1..4).rev() { // Check which robots can form currently
+							for resource_idx in (0..4).rev() { // Check which robots can form currently
 								let ((_,cell1), cost2) = blueprint[resource_idx];
 								if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
 									need.push(Consider{want:Some(Cell::from_int(resource_idx as u8).unwrap()), history:consider.history.clone(), ..consider})
@@ -199,7 +222,8 @@ fn main() -> Result<(), Error> {
 
 							// Spend money
 							let (cost1, cost2) = blueprint[want as usize];
-							if robot_can(cost1, consider.cells)
+							if consider.time+1 < TIME_LIMIT // EG, don't bother buying robots in the last second
+							&& robot_can(cost1, consider.cells)
 							&& match cost2 { None=>true, Some(cost)=>robot_can(cost, consider.cells) } {
 								robot_deplete(cost1, &mut consider.cells);
 								if let Some(cost) = cost2 { robot_deplete(cost, &mut consider.cells) }
@@ -213,7 +237,7 @@ fn main() -> Result<(), Error> {
 							for robot_idx in 0..4 {
 								consider.cells[robot_idx] += original_robots[robot_idx];
 							}
-							if consider.time > TIME_LIMIT { // TERMINATE
+							if consider.time >= TIME_LIMIT { // TERMINATE
 								winning_consider = best_consider(winning_consider, consider);
 								break 'considering;
 							}
