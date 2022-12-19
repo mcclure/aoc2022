@@ -38,7 +38,7 @@ const SPAWN_Y:i32 = 3; // 3 above highest point
 
 const DEBUG_VERBAL:bool = false;
 const DEBUG_FREEZE:bool = false;
-const DEBUG_FINAL:bool = true;
+const DEBUG_FINAL:bool = false;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
@@ -101,10 +101,10 @@ fn main() -> Result<(), Error> {
 		None => None
 	} { Some(0) => None, x => x };
 
-	let simulation_length = match args.next() {
+	let simulation_length = match match args.next() {
 		Some(x) => Some(x.parse::<usize>().map_err(|_|Error::new(ErrorKind::InvalidInput, "Argument 3 must be positive number"))?),
 		None => None
-	};
+	} { Some(0) => None, x => x };
 
 	let simulation_range = match simulation_length {
 		Some(x) => Either::Left(0..x), None => Either::Right(0..)
