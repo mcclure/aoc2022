@@ -5,21 +5,25 @@ use std::fs::File;
 use std::rc::Rc;
 use std::cell::RefCell;
 use either::Either;
+use int_enum::IntEnum;
 
-#[derive(Debug,Copy,Clone,PartialEq)]
+#[repr(u8)]
+#[derive(Debug,Copy,Clone,PartialEq,IntEnum)]
 enum Cell {
-	Ore,
-	Clay,
-	Obsidian,
-	Geode
+	Ore = 0,
+	Clay = 1,
+	Obsidian = 2,
+	Geode = 3
 }
-//impl Default for Cell { fn default() -> Self { Cell::Ore } }
+impl Default for Cell { fn default() -> Self { Cell::Ore } }
 
 type Count = i32;
 type Time = i32;
 
 // Creates, (costs1, costs2)
-type Robot = (Cell, ((Count,Cell),Option<(Count,Cell)>));
+type Cost = (Count,Cell);
+type Robot = (Cost,Option<Cost>);
+type RobotSpec = (Cell, Robot);
 
 const TIME_LIMIT:Time = 24;
 
@@ -64,20 +68,20 @@ fn main() -> Result<(), Error> {
 			mineral()
 		}
 
-		fn robot<'a>() -> Parser<'a, u8, Robot> {
+		fn robot<'a>() -> Parser<'a, u8, RobotSpec> {
 			(seq(b"Each ") * mineral() - seq (b" robot costs")) +
 			(whitespace() * minerals()
 			 + (whitespace() * seq(b"and") * whitespace() * minerals()).opt()
 			 - sym(b'.'))
 		}
 
-		fn statement<'a>() -> Parser<'a, u8, Vec<Robot>> {
+		fn statement<'a>() -> Parser<'a, u8, Vec<RobotSpec>> {
 			prelude() * whitespace() * list(robot(), whitespace()) - end()
 		}
 
 		let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: '{}'", s))) };
 
-		let mut blueprints: Vec<Vec<Robot>> = Default::default();
+		let mut blueprints: Vec<[Robot;4]> = Default::default();
 
 		// Scan file
 		for line in lines {
@@ -88,22 +92,39 @@ fn main() -> Result<(), Error> {
 			let parsed = (statement()).parse(line.as_bytes());
 			match parsed {
 				Err(_) => return invalid(line),
-				Ok(x) => {
-					blueprints.push(x);
+				Ok(robot_specs) => {
+					let mut robots: [Robot;4] = Default::default();
+					let mut robots_seen: [bool;4] = [false;4];
+					for (cell, robot) in robot_specs {
+						robots[cell as usize] = robot;
+						if robots_seen[cell as usize] {
+							return Err(Error::new(ErrorKind::InvalidInput, format!("Line has duplicate robots: '{}'", line)))
+						}
+						if let ((_, cell1),Some((_,cell2))) = robot { if cell1 == cell2 {
+							return Err(Error::new(ErrorKind::InvalidInput, format!("Robot has duplicate resource: '{}'", line)))
+						} }
+						robots_seen[cell as usize] = true;
+					}
+					if !robots_seen.iter().all(|x|*x) {
+						return Err(Error::new(ErrorKind::InvalidInput, format!("Line is missing robots: '{}'", line)))
+					}
+					blueprints.push(robots);
 				}
 			}
 		}
 		blueprints
 	};
 
+	#[derive(Debug)]
 	struct HistoryNode {
+		next: HistoryNodeRef,
 		cell:Cell,
-		at:Time,
-		next: HistoryNodeRef
+		at:Time
 	}
 	type HistoryNodeRef = Option<Rc<RefCell<HistoryNode>>>;
 
 	// History, time, robot count, resource count, next
+	#[derive(Debug)]
 	struct Consider {
 		history:HistoryNodeRef,
 		time:Time,
@@ -115,7 +136,7 @@ fn main() -> Result<(), Error> {
 	// id, geode count
 	type BlueprintRecord = (usize,Count);
 
-	let winning_blueprint: Option<BlueprintRecord> = None;
+	let mut winning_blueprint: Option<BlueprintRecord> = None;
 	fn best_blueprint(a:Option<BlueprintRecord>, b:BlueprintRecord) -> Option<BlueprintRecord> {
 		match a {
 			None => Some(b),
@@ -132,22 +153,81 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
+	fn robot_can(cost:Cost, count:[Count;4]) -> bool {
+		let (cost, idx) = cost;
+		count[idx as usize] >= cost as Count
+	}
+
+	fn robot_deplete(cost:Cost, count:&mut [Count;4]) {
+		let (cost, idx) = cost;
+		count[idx as usize] -= cost as Count;
+	}
+
 	let mut total:i64 = 0;
 
-	for (i,blueprint) in blueprints.iter().enumerate() {
-		let winning_consider: Option<Consider> = Default::default();
+	for (idx,blueprint) in blueprints.iter().enumerate() {
+		let mut winning_consider: Option<Consider> = Default::default();
 
 		let mut next_considers = vec![Consider{history:None, time:0, robots:[1,0,0,0], cells:[0;4], want:None}];
 		while !next_considers.is_empty() {
 			let considers = std::mem::take(&mut next_considers);
 			for mut consider in considers {
-				loop {
-					
+				'considering: loop {
+					match consider.want {
+						None => {
+							// Branch
+							let mut need:Vec<Consider> = Default::default();
+							for resource_idx in (1..4).rev() { // Check which robots can form currently
+								let ((_,cell1), cost2) = blueprint[resource_idx];
+								if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
+									need.push(Consider{want:Some(Cell::from_int(resource_idx as u8).unwrap()), history:consider.history.clone(), ..consider})
+								}
+							}
+
+							let mut need_iter = need.into_iter();
+							match need_iter.next() {
+								None => panic!("Blueprint {}: Should always have 1 ore robot", idx+1),
+								Some(first) => {
+									consider = first;
+									next_considers.extend(need_iter);
+								}
+							}
+						},
+						Some(want) => {
+							// Core logic here
+							let original_robots = consider.robots;
+
+							// Spend money
+							let (cost1, cost2) = blueprint[want as usize];
+							if robot_can(cost1, consider.cells)
+							&& match cost2 { None=>true, Some(cost)=>robot_can(cost, consider.cells) } {
+								robot_deplete(cost1, &mut consider.cells);
+								if let Some(cost) = cost2 { robot_deplete(cost, &mut consider.cells) }
+								consider.robots[want as usize] += 1;
+								consider.history = Some(Rc::new(RefCell::new(HistoryNode { cell:want, at:consider.time, next: consider.history.clone() })));
+								consider.want = None;
+							}
+
+							// Pass time
+							consider.time += 1;
+							for robot_idx in 0..4 {
+								consider.cells[robot_idx] += original_robots[robot_idx];
+							}
+							if consider.time > TIME_LIMIT { // TERMINATE
+								winning_consider = best_consider(winning_consider, consider);
+								break 'considering;
+							}
+						}
+					}
 				}
 			}
 		}
 
-		total += ((i as i64)+1)*(score_consider(&winning_consider.unwrap()) as i64);
+		println!("Blueprint {}, best: {:?}", idx+1, winning_consider);
+
+		let score = score_consider(&winning_consider.unwrap());
+		winning_blueprint = best_blueprint(winning_blueprint, (idx, score));
+		total += ((idx as i64)+1)*(score as i64);
 	}
 
 	// Final score
@@ -156,7 +236,6 @@ fn main() -> Result<(), Error> {
 		Some((id, count)) =>
 			println!("Best {} with {}", id+1, count)
 	}
-
 
 	println!("{}", total);
 
