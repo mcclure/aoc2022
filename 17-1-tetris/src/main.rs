@@ -36,8 +36,8 @@ const WIDTH:i32 = 7;
 const SPAWN_X:i32 = 2; // 2 from left wall
 const SPAWN_Y:i32 = 3; // 3 above highest point
 
-const DEBUG_VERBAL:bool = true;
-const DEBUG_FREEZE:bool = true;
+const DEBUG_VERBAL:bool = false;
+const DEBUG_FREEZE:bool = false;
 const DEBUG_FINAL:bool = true;
 
 fn main() -> Result<(), Error> {
@@ -75,22 +75,24 @@ fn main() -> Result<(), Error> {
 		let mut minos: Vec<HashSet<IVec2>> = Default::default();
 		let mut mino_heights: Vec<i32> = Default::default();
 		let mut mino: HashSet<IVec2> = Default::default();
-		let mut height = 0;
+		let mut y_root:usize = 0;
+		let mut height:usize = 0;
 		for (y,line) in MINO_SPEC.lines().enumerate() {
 			if line.is_empty() {
 				minos.push(std::mem::take(&mut mino));
-				mino_heights.push(std::mem::take(&mut height));
+				mino_heights.push(std::mem::take(&mut height) as i32);
+				y_root = y+1;
 			} else {
 				for (x,ch) in line.chars().enumerate() {
 					if ch == '#' {
-						mino.insert(IVec2::new(x as i32,y as i32));
+						mino.insert(IVec2::new(x as i32,(y-y_root) as i32));
 					}
 				}
 				height += 1;
 			}
 		}
 		minos.push(mino);
-		mino_heights.push(height);
+		mino_heights.push(height as i32);
 		(minos, mino_heights)
 	};
 
@@ -110,55 +112,53 @@ fn main() -> Result<(), Error> {
 	};
 
 	let mut board: HashSet<IVec2> = Default::default();
-	let mut max:i32 = 0;
+	let mut watermark:i32 = 0;
 	let mut at: Option<IVec2> = None; 
 	let mut mino_at = 0;
 	let mut frozen = 0; // For debugging
 
-	for t in 0..simulation_length {
+	for t in 0.. {
 		let mino = &minos[mino_at];
 		if at.is_none() { // New piece
-			at = Some(IVec2::new(SPAWN_X, max + SPAWN_Y));
+			at = Some(IVec2::new(SPAWN_X, watermark + SPAWN_Y));
 			if DEBUG_VERBAL { println!("New piece {} at {:?}", mino_at, at) }
 		}
-		match at {
-			Some(at_unwrap) => {
-				let right = ctrl[t % ctrl.len()];
-				let mut try_move = |v:IVec2, down:bool| {
-					let at_moved = at_unwrap + v;
-					if DEBUG_VERBAL { println!("{:?}+{:?} Trying move to {}...", at, v, at_moved) }
-					for &cell in mino {
-						let at_cell = at_moved + cell;
-						//if DEBUG_VERBAL { println!("Check x {} {} {} {}", at_cell.x, at_cell.x < 0, at_cell.x >= WIDTH, at_cell.x < 0 || at_cell.x >= WIDTH) }
-						if at_cell.x < 0 || at_cell.x >= WIDTH { return }
-						if at_cell.y < 0 || board.contains(&at_cell) {
-							if down {
-								if DEBUG_VERBAL { println!("...froze!") }
-								mino_at += 1;
-								mino_at %= minos.len();
-								for &cell in mino { // Shadow
-									match at {
-										Some(at_unwrap) => {
-											let at_cell = at_unwrap + cell;
-											board.insert(at_cell);
-											max = cmp::max(max, at_cell.y);
-										},
-										None => unreachable!() // Because None can only be set in second call
-									}
+		{
+			let right = ctrl[t % ctrl.len()];
+			let mut try_move = |v:IVec2, down:bool| {
+				let at_unwrap = match at { Some(at) =>at, None => unreachable!() };
+				let at_moved = at_unwrap + v;
+				if DEBUG_VERBAL { println!("{:?}+{:?} Trying move to {}...", at, v, at_moved) }
+				for &cell in mino {
+					let at_cell = at_moved + cell;
+					//if DEBUG_VERBAL { println!("Check x {} {} {} {}", at_cell.x, at_cell.x < 0, at_cell.x >= WIDTH, at_cell.x < 0 || at_cell.x >= WIDTH) }
+					if at_cell.x < 0 || at_cell.x >= WIDTH { return }
+					if at_cell.y < 0 || board.contains(&at_cell) {
+						if down {
+							if DEBUG_VERBAL { println!("...froze!") }
+							mino_at += 1;
+							mino_at %= minos.len();
+							for &cell in mino { // Shadow
+								match at {
+									Some(at_unwrap) => {
+										let at_cell = at_unwrap + cell;
+										board.insert(at_cell);
+										watermark = cmp::max(watermark, at_cell.y+1);
+									},
+									None => unreachable!() // Because None can only be set in second call
 								}
-								frozen += 1;
-								at = None;
 							}
-							return
+							frozen += 1;
+							at = None;
 						}
+						return
 					}
-					at = Some(at_moved);
-					if DEBUG_VERBAL { println!("...success. {:?}", at) }
-				};
-				try_move(if right { IVec2::X } else { -IVec2::X }, false);
-				try_move(-IVec2::Y, true);
-			}
-			_ => unreachable!()
+				}
+				at = Some(at_moved);
+				if DEBUG_VERBAL { println!("...success. {:?}", at) }
+			};
+			try_move(if right { IVec2::X } else { -IVec2::X }, false);
+			try_move(-IVec2::Y, true);
 		}
 		if match report_progress {
 			None => false,
@@ -166,8 +166,8 @@ fn main() -> Result<(), Error> {
 		} || (DEBUG_FREEZE && at.is_none())
 		  || ((DEBUG_FINAL || !report_progress.is_none()) &&
 		  	  (t==(simulation_length-1) || match max_frozen { None => false, Some(max_frozen) => frozen == max_frozen })) {
-			println!("Height: {}", max);
-			for y in (0..=(match at { None => max, Some(at) => {println!("{}+{}",at.y,mino_heights[mino_at]);cmp::max(max, at.y+mino_heights[mino_at])} })).rev() {
+			println!("Height: {}", watermark);
+			for y in (0..=(match at { None => watermark, Some(at) => {println!("{}+{}",at.y,mino_heights[mino_at]);cmp::max(watermark, at.y+mino_heights[mino_at])} })).rev() {
 				print!("|");
 				for x in 0..WIDTH {
 					let check = IVec2::new(x,y);
@@ -186,7 +186,7 @@ fn main() -> Result<(), Error> {
 	}
 
 	// Final score
-	println!("{}", max+1); // Max index -> height
+	println!("{}", watermark);
 
 	Ok(())
 }
