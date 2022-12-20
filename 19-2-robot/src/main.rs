@@ -29,7 +29,6 @@ type Robot = (Cost,Option<Cost>);
 type RobotSpec = (Cell, Robot);
 
 const TIME_LIMIT:Time = 32;
-const MAXIMUM_DECISION:Decision = 26;
 
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
@@ -143,7 +142,7 @@ fn main() -> Result<(), Error> {
 
 	impl fmt::Debug for Consider {
 	    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-	        let mut f = f.debug_struct("Point");
+	        let mut f = f.debug_struct("Consider");
 	        let mut f = f
 	         .field("time", &self.time)
 	         .field("robots", &self.robots)
@@ -199,10 +198,17 @@ fn main() -> Result<(), Error> {
 
 	let mut total:i64 = 1;
 
+	// maximum_decision is last known PLUS ONE
+	let cheat_codes:Vec<(i64, Decision, Consider)> = vec![
+		(91631561407, 23, Consider { time: 32, robots: [2, 6, 4, 2], cells: [15, 48, 12, 8], want: Some(Cell::Geode) }),
+		(5728021183, 24, Consider { time: 32, robots: [3, 7, 4, 5], cells: [15, 70, 8, 24], want: Some(Cell::Geode) }),
+		(91631561407, 24, Consider { time: 32, robots: [4, 9, 5, 3], cells: [37, 81, 10, 12], want: Some(Cell::Geode)})
+	];
+
 	// A "code" is a bitmasked sequence of branches. Each 2 bits represent a branch, lowest bits being least important
 	for (idx,blueprint) in blueprints.iter().enumerate() {
-		let mut winning_consider: Option<Consider> = Default::default();
-		let mut code_at = 0;
+		let (mut code_at, decision_limit, mut winning_consider): (i64, Decision, Consider) = cheat_codes[idx].clone();
+		let mut winning_consider = Some(winning_consider);
 		let mut decision_ceiling: Decision = 1;
 		let mut raise_ceiling:bool = false;
 
@@ -217,7 +223,7 @@ fn main() -> Result<(), Error> {
 					None => {
 						let resource_idx = 3 - ((code_at >> (decision*2)) & 0x3);
 
-						let ((_,cell1), cost2) = blueprint[resource_idx];
+						let ((_,cell1), cost2) = blueprint[resource_idx as usize];
 //println!("d {} i {} ({:?}), cell1 {:?}, robot {}, cost2 {:?} robot2 {:?}", decision, resource_idx, Cell::from_int(resource_idx as u8).unwrap(), cell1, consider.robots[cell1 as usize], cost2, cost2.map(|(_,cell)|consider.robots[cell as usize]));
 						if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
 							consider.want = Some(Cell::from_int(resource_idx as u8).unwrap());
@@ -260,7 +266,7 @@ if old_ceiling != decision_ceiling { println!("DECISION CEILING {} code {}", dec
 						if consider.time >= TIME_LIMIT { // TERMINATE
 							let won:bool;
 							(winning_consider, won) = best_consider(winning_consider, &consider);
-							if won { println!("Better {:?}", consider) }
+							if won { println!("Better {:?} code {}", consider, code_at) }
 							break 'clock;
 						}
 						/*
@@ -275,7 +281,7 @@ if old_ceiling != decision_ceiling { println!("DECISION CEILING {} code {}", dec
 			}
 //println!("CODE {}", code_at);
 			code_at += 1;
-			if code_at > (1 << (decision_ceiling*2)) || (decision+1)>=MAXIMUM_DECISION {
+			if code_at > (1 << (decision_ceiling*2)) || (decision+1)>=decision_limit {
 				break 'construct;
 			}
 		}
