@@ -5,6 +5,7 @@ use std::fmt;
 use std::fs::File;
 use std::rc::Rc;
 use std::cell::RefCell;
+use std::cmp;
 use either::Either;
 use int_enum::IntEnum;
 
@@ -20,6 +21,7 @@ impl Default for Cell { fn default() -> Self { Cell::Ore } }
 
 type Count = i32;
 type Time = i32;
+type Decision = i32;
 
 // Creates, (costs1, costs2)
 type Cost = (Count,Cell);
@@ -27,6 +29,7 @@ type Robot = (Cost,Option<Cost>);
 type RobotSpec = (Cell, Robot);
 
 const TIME_LIMIT:Time = 32;
+const MAXIMUM_DECISION:Decision = 26;
 
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
@@ -128,6 +131,7 @@ fn main() -> Result<(), Error> {
 	type HistoryNodeRef = Option<Rc<RefCell<HistoryNode>>>;
 
 	// History, time, robot count, resource count, next
+	#[derive(Clone)]
 	struct Consider {
 		#[cfg(debug_assertions)]
 		history:HistoryNodeRef,
@@ -176,10 +180,10 @@ fn main() -> Result<(), Error> {
 	fn score_consider(a:&Consider) -> Count {
 		a.cells[3]
 	}
-	fn best_consider(a:Option<Consider>, b:Consider) -> Option<Consider> {
+	fn best_consider(a:Option<Consider>, b:&Consider) -> (Option<Consider>, bool) {
 		match a {
-			None => Some(b),
-			Some(a) => Some(if score_consider(&b) > score_consider(&a) { b } else { a })
+			None => (Some(b.clone()), true),
+			Some(a) => if score_consider(b) > score_consider(&a) { (Some(b.clone()), true) } else { (Some(a), false) }
 		}
 	}
 
@@ -195,73 +199,84 @@ fn main() -> Result<(), Error> {
 
 	let mut total:i64 = 1;
 
+	// A "code" is a bitmasked sequence of branches. Each 2 bits represent a branch, lowest bits being least important
 	for (idx,blueprint) in blueprints.iter().enumerate() {
 		let mut winning_consider: Option<Consider> = Default::default();
+		let mut code_at = 0;
+		let mut decision_ceiling: Decision = 1;
+		let mut raise_ceiling:bool = false;
 
-		let mut next_considers = vec![Consider{
-			#[cfg(debug_assertions)] history:None, 
-			time:0, robots:[1,0,0,0], cells:[0;4], want:None}];
-		while !next_considers.is_empty() {
-			let considers = std::mem::take(&mut next_considers);
-			for mut consider in considers {
-				'considering: loop {
-					match consider.want {
-						None => {
-							// Branch
-							let mut need:Vec<Consider> = Default::default();
-							for resource_idx in (0..4).rev() { // Check which robots can form currently
-								let ((_,cell1), cost2) = blueprint[resource_idx];
-								if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
-									need.push(Consider{
-										want:Some(Cell::from_int(resource_idx as u8).unwrap()),
-										#[cfg(debug_assertions)] history:consider.history.clone(),
-										..consider})
-								}
-							}
+		'construct: loop {
+			let mut consider = Consider{
+				#[cfg(debug_assertions)] history:None, 
+				time:0, robots:[1,0,0,0], cells:[0;4], want:None
+			};
+			let mut decision: Decision = 0;
+			'clock: loop {
+				match consider.want {
+					None => {
+						let resource_idx = 3 - ((code_at >> (decision*2)) & 0x3);
 
-							let mut need_iter = need.into_iter();
-							match need_iter.next() {
-								None => panic!("Blueprint {}: Should always have 1 ore robot", idx+1),
-								Some(first) => {
-									consider = first;
-									next_considers.extend(need_iter);
-								}
-							}
-						},
-						Some(want) => {
-							// Core logic here
-							let original_robots = consider.robots;
-
-							// Spend money
-							let (cost1, cost2) = blueprint[want as usize];
-							if consider.time+1 < TIME_LIMIT // EG, don't bother buying robots in the last second
-							&& robot_can(cost1, consider.cells)
-							&& match cost2 { None=>true, Some(cost)=>robot_can(cost, consider.cells) } {
-								robot_deplete(cost1, &mut consider.cells);
-								if let Some(cost) = cost2 { robot_deplete(cost, &mut consider.cells) }
-								consider.robots[want as usize] += 1;
-								#[cfg(debug_assertions)] {
-									consider.history = Some(Rc::new(RefCell::new(HistoryNode 
-										{ cell:want, at:consider.time, 
-											#[cfg(debug_assertions)]
-											next: consider.history.clone()
-										})));
-								}
-								consider.want = None;
-							}
-
-							// Pass time
-							consider.time += 1;
-							for robot_idx in 0..4 {
-								consider.cells[robot_idx] += original_robots[robot_idx];
-							}
-							if consider.time >= TIME_LIMIT { // TERMINATE
-								winning_consider = best_consider(winning_consider, consider);
-								break 'considering;
-							}
+						let ((_,cell1), cost2) = blueprint[resource_idx];
+//println!("d {} i {} ({:?}), cell1 {:?}, robot {}, cost2 {:?} robot2 {:?}", decision, resource_idx, Cell::from_int(resource_idx as u8).unwrap(), cell1, consider.robots[cell1 as usize], cost2, cost2.map(|(_,cell)|consider.robots[cell as usize]));
+						if consider.robots[cell1 as usize] > 0 && match cost2 { None => true, Some((_, cell)) => consider.robots[cell as usize] > 0 } {
+							consider.want = Some(Cell::from_int(resource_idx as u8).unwrap());
+							//#[cfg(debug_assertions)] { cell.history = history:consider.history.clone(); }
+						} else {
+							break 'clock;
 						}
+					},
+					Some(want) => {
+						// Core logic here
+						let original_robots = consider.robots;
+
+						// Spend money
+						let (cost1, cost2) = blueprint[want as usize];
+						if consider.time+1 < TIME_LIMIT // EG, don't bother buying robots in the last second
+						&& robot_can(cost1, consider.cells)
+						&& match cost2 { None=>true, Some(cost)=>robot_can(cost, consider.cells) } {
+							robot_deplete(cost1, &mut consider.cells);
+							if let Some(cost) = cost2 { robot_deplete(cost, &mut consider.cells) }
+							consider.robots[want as usize] += 1;
+							#[cfg(debug_assertions)] {
+								consider.history = Some(Rc::new(RefCell::new(HistoryNode 
+									{ cell:want, at:consider.time, 
+										#[cfg(debug_assertions)]
+										next: consider.history.clone()
+									})));
+							}
+							consider.want = None;
+							decision += 1;
+let old_ceiling = decision_ceiling;
+							decision_ceiling = cmp::max(decision_ceiling, decision+1);
+if old_ceiling != decision_ceiling { println!("DECISION CEILING {} code {}", decision_ceiling, code_at) }
+						}
+
+						// Pass time
+						consider.time += 1;
+						for robot_idx in 0..4 {
+							consider.cells[robot_idx] += original_robots[robot_idx];
+						}
+						if consider.time >= TIME_LIMIT { // TERMINATE
+							let won:bool;
+							(winning_consider, won) = best_consider(winning_consider, &consider);
+							if won { println!("Better {:?}", consider) }
+							break 'clock;
+						}
+						/*
+						// Override?
+						if let Some(best_consider) = best_consider {
+							let best_score = score_consider(&best_consider);
+							let score = score_consider(&consider);
+						}
+						*/
 					}
 				}
+			}
+//println!("CODE {}", code_at);
+			code_at += 1;
+			if code_at > (1 << (decision_ceiling*2)) || (decision+1)>=MAXIMUM_DECISION {
+				break 'construct;
 			}
 		}
 
