@@ -42,9 +42,9 @@ const king:Name = *b"root"; // King of bongo bong
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
 
-	let (monkey_hash, monkey_queue) = { 
+	let (mut monkey_hash, mut monkey_queue) = { 
 	    // Load file from command-line argument or (if -) stdin
-		let filename = std::env::args().fuse().nth(1);
+		let filename = args.nth(1);
 		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
 			Some("-") => either::Left(BufReader::new(stdin())),
@@ -88,8 +88,6 @@ fn main() -> Result<(), Error> {
 			)- end()
 		}
 
-		let mut total: i64 = 0;
-
 		let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: '{}'", s))) };
 		let invalid_duplicate = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Duplicate monkey: '{}'", std::str::from_utf8(&n[..]).unwrap()))) };
 		let invalid_not_found = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Monkey not found: '{}'", std::str::from_utf8(&n[..]).unwrap()))) };
@@ -97,6 +95,7 @@ fn main() -> Result<(), Error> {
 
 		let mut monkey_hash: HashMap<Name, Monkey> = Default::default();
 		let mut monkey_queue: Vec<Name> = Default::default();
+		let mut monkey_next: Vec<(Name,Name)> = Default::default();
 
 		// Scan file
 		for line in lines {
@@ -120,19 +119,10 @@ fn main() -> Result<(), Error> {
 						next:None
 					};
 					if let Some((n1,n2)) = notify {
-						for n in [n1,n2] {
-							match monkey_hash.entry(n) {
-								Entry::Vacant(_) => return invalid_not_found(n),
-								Entry::Occupied(mut m) =>
-									if m.get().next.is_none() {
-										m.get_mut().next = Some(name);
-									} else {
-										return invalid_duplicate2(n);
-									}
-							};
-						}
+						monkey_next.push((n1,name));
+						monkey_next.push((n2,name));
 					} else {
-						// Literal monkey
+						// Literal monkey must yell
 						monkey_queue.push(name);
 					}
 					match monkey_hash.entry(name) {
@@ -142,11 +132,29 @@ fn main() -> Result<(), Error> {
 				}
 			}
 		}
+
+		for (from,to) in monkey_next {
+			match monkey_hash.entry(from) {
+				Entry::Vacant(_) => return invalid_not_found(from),
+				Entry::Occupied(mut m) =>
+					if m.get().next.is_none() {
+						m.get_mut().next = Some(to);
+					} else {
+						return invalid_duplicate2(from);
+					}
+			};
+		}
 		(monkey_hash, monkey_queue)
 	};
 
-	// Final score
-	//println!("{}", total);
+	while !monkey_queue.is_empty() {
+		for name in std::mem::take(&mut monkey_queue) {
+			match monkey_hash[&name].data {
+				MonkeyData::Literal(i) => println!("Yell {}",i),
+				_ => ()
+			} 
+		}
+	}
 
-	Ok(())
+	Err(Error::new(ErrorKind::InvalidInput, "Monkeys didn't form a pyramid"))
 }
