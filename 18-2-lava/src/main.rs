@@ -1,4 +1,4 @@
-// Summary
+// Calculate the surface area of a voxel object (exterior surface only)
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;

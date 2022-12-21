@@ -1,4 +1,4 @@
-// Summary
+// Calculate the result of a partially reversedsystem of equations
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
@@ -24,7 +24,8 @@ enum Chant {
 #[derive(Debug)]
 enum Value {
 	Literal(i64),
-	Waiting(Name)
+	Waiting(Name),
+	HumanWaiting(Name),
 }
 
 type EqMonkey = [Value;2];
@@ -32,7 +33,8 @@ type EqMonkey = [Value;2];
 #[derive(Debug)]
 enum MonkeyData {
 	Eq(EqMonkey,Op),
-	Literal(i64)
+	Literal(i64),
+	Human
 }
 struct Monkey {
 	data:MonkeyData,
@@ -114,11 +116,15 @@ fn main() -> Result<(), Error> {
 				Ok((name, chant)) => {
 					let mut notify: Option<(Name,Name)> = Default::default();
 					let monkey = Monkey {
-						data:match chant {
-							Chant::Literal(i)=>MonkeyData::Literal(i),
-							Chant::Pair(n1,op,n2)=> {
-								notify = Some((n1,n2));
-								MonkeyData::Eq([Value::Waiting(n1),Value::Waiting(n2)],op)
+						data:if name == HUMAN {
+							MonkeyData::Human
+						} else {
+							match chant {
+								Chant::Literal(i)=>MonkeyData::Literal(i),
+								Chant::Pair(n1,op,n2)=> {
+									notify = Some((n1,n2));
+									MonkeyData::Eq([Value::Waiting(n1),Value::Waiting(n2)],op)
+								}
 							}
 						},
 						next:None
@@ -127,7 +133,7 @@ fn main() -> Result<(), Error> {
 						monkey_next.push((n1,name));
 						monkey_next.push((n2,name));
 					} else {
-						// Literal monkey must yell
+						// Literal monkey (and human) must yell
 						monkey_queue.push(name);
 					}
 					match monkey_hash.entry(name) {
@@ -155,29 +161,95 @@ fn main() -> Result<(), Error> {
 
 	while !monkey_queue.is_empty() {
 		for name in std::mem::take(&mut monkey_queue) {
+			// None if human waiting or Some() if literal
 			let value = match monkey_hash[&name].data {
-				MonkeyData::Literal(i) => { i },
+				MonkeyData::Literal(i) => { Some(i) },
 				MonkeyData::Eq([Value::Literal(i1),Value::Literal(i2)], op) => {
 					/*{
 						let ch = match op { Op::Plus => '+', Op::Minus => '-', Op::Times => '*', Op::Divide => '/' };
 						println!("{} = {} {} {}", monkey_name(&name), i1, ch, i2);
 					}*/
-					match op {
+					Some(match op {
 						Op::Plus  => { i1 + i2 },
 						Op::Minus => { i1 - i2 }
 						Op::Times => { i1 * i2 }
 						Op::Divide => {
-							if i1 == 0 || i2 == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero??")) }
+							if i2 == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero??")) }
 							i1 / i2
 						}
-					}
+					})
 				},
-				_ => panic!("Bad queue")
+				MonkeyData::Eq([Value::Waiting(_),_],_) | MonkeyData::Eq([_, Value::Waiting(_)],_) =>
+					panic!("Bad queue"),
+				_ => None // This is either a Human or it has a HumanWaiting
 			};
 			//println!("\t = {}", value);
 			if name == KING { // DONE
-				println!("{}", value);
-				return Ok(())
+				// The tree now consists of two branches, one calculated, one not,
+				// with each branch in the uncalculated side having the same "one-sided" property.
+				// Unwind the tree while calculating "backward".
+				let mut unwind_monkey_name = name;
+				let mut result:Option<i64> = None;
+				loop {
+					let unwind_monkey = &monkey_hash[&unwind_monkey_name];
+					let mut unwind_next:Option<Name> = None;
+					match &unwind_monkey.data {
+						MonkeyData::Human => {
+							println!("{:?}", result);
+							return Ok(());
+						},
+						MonkeyData::Eq(values, op) => {
+							let mut human_idx:Option<usize> = None;
+							let mut other_value:Option<i64> = None;
+							for (idx,value) in values.iter().enumerate() {
+								match value {
+									Value::HumanWaiting(name2) => {
+										if !unwind_next.is_none() || !human_idx.is_none() { panic!("Too many humans") }
+										unwind_next = Some(*name2);
+										human_idx = Some(idx);
+									},
+									Value::Literal(value) => {
+										other_value = Some(*value);
+									}
+									_ => panic!("Malformed tree")
+								}
+								if let (Some(unwind_name),Some(human_idx),Some(value)) = (unwind_next,human_idx,other_value) {
+									result = Some(match op {
+										// root = othr + humn => humn = root - othr
+										Op::Plus => { value - result.unwrap_or(0) },
+										Op::Minus => {
+											if human_idx == 0 {
+												// root = humn - othr => humn = root + othr
+												value + result.unwrap_or(0)
+											} else {
+												// root = othr - humn => humn = othr - root
+												result.unwrap_or(0) - value
+											}
+										},
+										// root = othr * humn => humn = root/othr
+										Op::Times => {
+											let result = result.unwrap_or(1);
+											if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
+											value / result
+										},
+										Op::Divide => {
+											if human_idx == 0 {
+												// root = humn / othr => humn = root * othr
+												value * result.unwrap_or(1)
+											} else {
+												// root = othr / humn => humn = othr / root
+												if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
+												result.unwrap_or(1) / value
+											}
+										}
+									});
+									unwind_monkey_name = unwind_name;
+								} else { panic!("Malformed tree 2") }
+							}
+						}
+						MonkeyData::Literal(_) => panic!("Malformed tree 3")
+					}
+				}
 			}
 			//println!("Check {}, {:?}", monkey_name(&name), monkey_hash[&name].next);
 			if let Some(next) = monkey_hash[&name].next {
@@ -188,7 +260,9 @@ fn main() -> Result<(), Error> {
 						for v in values.iter_mut() {
 							if let Value::Waiting(name2) = &v {
 								if name == *name2 {
-									*v = Value::Literal(value);
+									*v =
+										if let Some(value) = value { Value::Literal(value) }
+										else { Value::HumanWaiting(*name2) };
 									found = true;
 								}
 							}

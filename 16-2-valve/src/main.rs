@@ -1,4 +1,4 @@
-// Travelling salesman program but weird alo there's an elephant
+// Travelling salesman program but weird also there's an elephant
 // Second argument is printout debug
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};

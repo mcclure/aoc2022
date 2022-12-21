@@ -1,0 +1,5 @@
+root: pppw + secd
+secd: humn + pppa 
+humn: 5
+pppa: 5
+pppw: 10

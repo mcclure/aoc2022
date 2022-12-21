@@ -1,4 +1,4 @@
-// Summary
+// Simulate a badly played game of tetris
 
 use std::io::{BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;

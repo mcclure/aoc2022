@@ -1,4 +1,4 @@
-// Summary
+// Calculate the result of a system of equations
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;

@@ -1,0 +1,3 @@
+root: pppw + humn 
+humn: 5
+pppw: 10

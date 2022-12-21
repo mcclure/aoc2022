@@ -1,4 +1,4 @@
-// Summary
+// Calculate an optimal allocation of resources (hard mode)
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fmt;
