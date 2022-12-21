@@ -200,8 +200,8 @@ fn main() -> Result<(), Error> {
 
 	// maximum_decision is last known PLUS ONE
 	let cheat_codes:Vec<(i64, Decision, Consider)> = vec![
-		(91631561407, 23, Consider { time: 32, robots: [2, 6, 4, 2], cells: [15, 48, 12, 8], want: Some(Cell::Geode) }),
-		(5728021183, 24, Consider { time: 32, robots: [3, 7, 4, 5], cells: [15, 70, 8, 24], want: Some(Cell::Geode) }),
+		(366526245567, 24, Consider { time: 32, robots: [4, 10, 6, 2], cells: [32, 64, 24, 9], want: Some(Cell::Geode) }),
+		(87416023791, 26, Consider { time: 32, robots: [3, 7, 6, 5], cells: [9, 42, 18, 25], want: Some(Cell::Geode) }),
 		(91631561407, 24, Consider { time: 32, robots: [4, 9, 5, 3], cells: [37, 81, 10, 12], want: Some(Cell::Geode)})
 	];
 

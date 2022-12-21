@@ -1,0 +1,1 @@
+cat data/puzzle.txt | perl -e '@a = <>; my %x = (); for (@a) { s/^\w\w\w\w: //g; chomp; @b = split(/ . /); for (@b) { print ("DOUBLE $_\n") if $x{$_}; $x{$_} = 1; } }' | less
