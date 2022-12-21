@@ -219,30 +219,29 @@ fn main() -> Result<(), Error> {
 								result = Some(
 									if let Some(result) = result { match op {
 										// root = othr + humn => humn = root - othr
-										Op::Plus => { value - result },
+										Op::Plus => { result - value },
 										Op::Minus => {
 											if human_idx == 0 {
 												// root = humn - othr => humn = root + othr
-												value + result
+												result + value
 											} else {
 												// root = othr - humn => humn = othr - root
-												result - value
+												value - result
 											}
 										},
 										// root = othr * humn => humn = root/othr
 										Op::Times => {
-											let result = result;
-											if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
-											value / result
+											if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
+											result / value
 										},
 										Op::Divide => {
 											if human_idx == 0 {
 												// root = humn / othr => humn = root * othr
-												value * result
+												result * value
 											} else {
 												// root = othr / humn => humn = othr / root
-												if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
-												result / value
+												if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
+												value / result
 											}
 										}
 									// This case is hit for 'root' only. When it is hit,

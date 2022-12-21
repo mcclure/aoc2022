@@ -1,0 +1,6 @@
+
+root: ltrl + secd
+ltrl:100
+humn: 0
+secd:humn + oprd
+oprd:4
