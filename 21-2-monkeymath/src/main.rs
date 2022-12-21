@@ -213,39 +213,40 @@ fn main() -> Result<(), Error> {
 									}
 									_ => panic!("Malformed tree")
 								}
-								if let (Some(unwind_name),Some(human_idx),Some(value)) = (unwind_next,human_idx,other_value) {
-									result = Some(match op {
-										// root = othr + humn => humn = root - othr
-										Op::Plus => { value - result.unwrap_or(0) },
-										Op::Minus => {
-											if human_idx == 0 {
-												// root = humn - othr => humn = root + othr
-												value + result.unwrap_or(0)
-											} else {
-												// root = othr - humn => humn = othr - root
-												result.unwrap_or(0) - value
-											}
-										},
-										// root = othr * humn => humn = root/othr
-										Op::Times => {
-											let result = result.unwrap_or(1);
-											if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
-											value / result
-										},
-										Op::Divide => {
-											if human_idx == 0 {
-												// root = humn / othr => humn = root * othr
-												value * result.unwrap_or(1)
-											} else {
-												// root = othr / humn => humn = othr / root
-												if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
-												result.unwrap_or(1) / value
-											}
-										}
-									});
-									unwind_monkey_name = unwind_name;
-								} else { panic!("Malformed tree 2") }
 							}
+							//println!("{:?}, {:?}, {:?}", unwind_next, human_idx, other_value);
+							if let (Some(unwind_name),Some(human_idx),Some(value)) = (unwind_next,human_idx,other_value) {
+								result = Some(match op {
+									// root = othr + humn => humn = root - othr
+									Op::Plus => { value - result.unwrap_or(0) },
+									Op::Minus => {
+										if human_idx == 0 {
+											// root = humn - othr => humn = root + othr
+											value + result.unwrap_or(0)
+										} else {
+											// root = othr - humn => humn = othr - root
+											result.unwrap_or(0) - value
+										}
+									},
+									// root = othr * humn => humn = root/othr
+									Op::Times => {
+										let result = result.unwrap_or(1);
+										if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
+										value / result
+									},
+									Op::Divide => {
+										if human_idx == 0 {
+											// root = humn / othr => humn = root * othr
+											value * result.unwrap_or(1)
+										} else {
+											// root = othr / humn => humn = othr / root
+											if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
+											result.unwrap_or(1) / value
+										}
+									}
+								});
+								unwind_monkey_name = unwind_name;
+							} else { panic!("Malformed tree 2") }
 						}
 						MonkeyData::Literal(_) => panic!("Malformed tree 3")
 					}
