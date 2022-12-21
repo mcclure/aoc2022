@@ -21,6 +21,7 @@ enum Chant {
 	Pair(Name,Op,Name)
 }
 
+#[derive(Debug)]
 enum Value {
 	Literal(i32),
 	Waiting(Name)
@@ -28,6 +29,7 @@ enum Value {
 
 type EqMonkey = [Value;2];
 
+#[derive(Debug)]
 enum MonkeyData {
 	Eq(EqMonkey,Op),
 	Literal(i32)
@@ -37,10 +39,12 @@ struct Monkey {
 	next:Option<Name>
 }
 
-const king:Name = *b"root"; // King of bongo bong
+const KING:Name = *b"root"; // King of bongo bong
 
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
+
+	fn monkey_name(n:&Name) -> &str { std::str::from_utf8(&n[..]).unwrap() }
 
 	let (mut monkey_hash, mut monkey_queue) = { 
 	    // Load file from command-line argument or (if -) stdin
@@ -89,9 +93,9 @@ fn main() -> Result<(), Error> {
 		}
 
 		let invalid = |s:&str| { return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized line: '{}'", s))) };
-		let invalid_duplicate = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Duplicate monkey: '{}'", std::str::from_utf8(&n[..]).unwrap()))) };
-		let invalid_not_found = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Monkey not found: '{}'", std::str::from_utf8(&n[..]).unwrap()))) };
-		let invalid_duplicate2 = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Duplicate monkey reference: '{}'", std::str::from_utf8(&n[..]).unwrap()))) };
+		let invalid_duplicate = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Duplicate monkey: '{}'", monkey_name(&n)))) };
+		let invalid_not_found = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Monkey not found: '{}'", monkey_name(&n)))) };
+		let invalid_duplicate2 = |n:Name| { return Err(Error::new(ErrorKind::InvalidInput, format!("Duplicate monkey reference: '{}'", monkey_name(&n)))) };
 
 		let mut monkey_hash: HashMap<Name, Monkey> = Default::default();
 		let mut monkey_queue: Vec<Name> = Default::default();
@@ -108,7 +112,7 @@ fn main() -> Result<(), Error> {
 				Err(_) => return invalid(line),
 				Ok((name, chant)) => {
 					let mut notify: Option<(Name,Name)> = Default::default();
-					let mut monkey = Monkey {
+					let monkey = Monkey {
 						data:match chant {
 							Chant::Literal(i)=>MonkeyData::Literal(i),
 							Chant::Pair(n1,op,n2)=> {
@@ -134,6 +138,7 @@ fn main() -> Result<(), Error> {
 		}
 
 		for (from,to) in monkey_next {
+			println!("From {} to {}", monkey_name(&from), monkey_name(&to));
 			match monkey_hash.entry(from) {
 				Entry::Vacant(_) => return invalid_not_found(from),
 				Entry::Occupied(mut m) =>
@@ -148,11 +153,57 @@ fn main() -> Result<(), Error> {
 	};
 
 	while !monkey_queue.is_empty() {
+		println!("BAOFFSDF");
 		for name in std::mem::take(&mut monkey_queue) {
-			match monkey_hash[&name].data {
-				MonkeyData::Literal(i) => println!("Yell {}",i),
-				_ => ()
-			} 
+			let value = match monkey_hash[&name].data {
+				MonkeyData::Literal(i) => { i },
+				MonkeyData::Eq([Value::Literal(i1),Value::Literal(i2)], op) => {
+					match op {
+						Op::Plus  => { i1 + i2 },
+						Op::Minus => { i1 - i2 }
+						Op::Times => { i1 * i2 }
+						Op::Divide => {
+							if i1 == 0 || i2 == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero??")) }
+							i1 / i2
+						}
+					}
+				},
+				_ => panic!("Bad queue")
+			};
+			if name == *b"root" { // DONE
+				println!("{}", value);
+				return Ok(())
+			}
+			println!("Check {}, {:?}", monkey_name(&name), monkey_hash[&name].next);
+			if let Some(next) = monkey_hash[&name].next {
+				let next_monkey = monkey_hash.get_mut(&next).unwrap();
+				match &mut next_monkey.data {
+					MonkeyData::Eq(values,_) => {
+						let mut found = false;
+						for mut v in values.iter_mut() {
+							if let Value::Waiting(name2) = &v {
+								if name == *name2 {
+									*v = Value::Literal(value);
+									found = true;
+								}
+							}
+						}
+						if !found { panic!("Next monkey wasn't waiting for us") }
+						let mut ready = true;
+						for v in values.iter() {
+							if let Value::Waiting(_) = v {
+								ready = false;
+							}
+						}
+						if ready {
+							monkey_queue.push(next)
+						}
+					}
+					_ => panic!("Literal monkey can't be next")
+				}
+			} else {
+				return Err(Error::new(ErrorKind::InvalidInput, format!("No next monkey for {}", monkey_name(&name))));
+			}
 		}
 	}
 
