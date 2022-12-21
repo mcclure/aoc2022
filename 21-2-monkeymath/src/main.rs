@@ -216,35 +216,39 @@ fn main() -> Result<(), Error> {
 							}
 							//println!("{:?}, {:?}, {:?}", unwind_next, human_idx, other_value);
 							if let (Some(unwind_name),Some(human_idx),Some(value)) = (unwind_next,human_idx,other_value) {
-								result = Some(match op {
-									// root = othr + humn => humn = root - othr
-									Op::Plus => { value - result.unwrap_or(0) },
-									Op::Minus => {
-										if human_idx == 0 {
-											// root = humn - othr => humn = root + othr
-											value + result.unwrap_or(0)
-										} else {
-											// root = othr - humn => humn = othr - root
-											result.unwrap_or(0) - value
+								result = Some(
+									if let Some(result) = result { match op {
+										// root = othr + humn => humn = root - othr
+										Op::Plus => { value - result },
+										Op::Minus => {
+											if human_idx == 0 {
+												// root = humn - othr => humn = root + othr
+												value + result
+											} else {
+												// root = othr - humn => humn = othr - root
+												result - value
+											}
+										},
+										// root = othr * humn => humn = root/othr
+										Op::Times => {
+											let result = result;
+											if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
+											value / result
+										},
+										Op::Divide => {
+											if human_idx == 0 {
+												// root = humn / othr => humn = root * othr
+												value * result
+											} else {
+												// root = othr / humn => humn = othr / root
+												if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
+												result / value
+											}
 										}
-									},
-									// root = othr * humn => humn = root/othr
-									Op::Times => {
-										let result = result.unwrap_or(1);
-										if result == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing multiplication??")) }
-										value / result
-									},
-									Op::Divide => {
-										if human_idx == 0 {
-											// root = humn / othr => humn = root * othr
-											value * result.unwrap_or(1)
-										} else {
-											// root = othr / humn => humn = othr / root
-											if value == 0 { return Err(Error::new(ErrorKind::InvalidInput, "Divide by zero while reversing division??")) }
-											result.unwrap_or(1) / value
-										}
-									}
-								});
+									// This case is hit for 'root' only. When it is hit,
+									// we are supposed to DISREGARD op and save only the value (op becomes '=')
+									} } else { value }
+								);
 								unwind_monkey_name = unwind_name;
 							} else { panic!("Malformed tree 2") }
 						}
