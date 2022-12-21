@@ -17,13 +17,13 @@ type Name = [u8;4];
 
 #[derive(Debug,Copy,Clone)]
 enum Chant {
-	Literal(i32),
+	Literal(i64),
 	Pair(Name,Op,Name)
 }
 
 #[derive(Debug)]
 enum Value {
-	Literal(i32),
+	Literal(i64),
 	Waiting(Name)
 }
 
@@ -32,7 +32,7 @@ type EqMonkey = [Value;2];
 #[derive(Debug)]
 enum MonkeyData {
 	Eq(EqMonkey,Op),
-	Literal(i32)
+	Literal(i64)
 }
 struct Monkey {
 	data:MonkeyData,
@@ -59,9 +59,9 @@ fn main() -> Result<(), Error> {
 
 		use pom::parser::*;
 
-		fn positive<'a>() -> Parser<'a, u8, i32> {
+		fn positive<'a>() -> Parser<'a, u8, i64> {
 			let integer = (one_of(b"123456789") - one_of(b"0123456789").repeat(0..)) | sym(b'0');
-			integer.collect().convert(std::str::from_utf8).convert(|x|x.parse::<i32>())
+			integer.collect().convert(std::str::from_utf8).convert(|x|x.parse::<i64>())
 		}
 
 		fn whitespace<'a>() -> Parser<'a, u8, ()> {
@@ -157,6 +157,10 @@ fn main() -> Result<(), Error> {
 			let value = match monkey_hash[&name].data {
 				MonkeyData::Literal(i) => { i },
 				MonkeyData::Eq([Value::Literal(i1),Value::Literal(i2)], op) => {
+					/*{
+						let ch = match op { Op::Plus => '+', Op::Minus => '-', Op::Times => '*', Op::Divide => '/' };
+						println!("{} = {} {} {}", monkey_name(&name), i1, ch, i2);
+					}*/
 					match op {
 						Op::Plus  => { i1 + i2 },
 						Op::Minus => { i1 - i2 }
@@ -169,6 +173,7 @@ fn main() -> Result<(), Error> {
 				},
 				_ => panic!("Bad queue")
 			};
+			//println!("\t = {}", value);
 			if name == KING { // DONE
 				println!("{}", value);
 				return Ok(())
