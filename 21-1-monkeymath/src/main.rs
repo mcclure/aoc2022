@@ -138,7 +138,7 @@ fn main() -> Result<(), Error> {
 		}
 
 		for (from,to) in monkey_next {
-			println!("From {} to {}", monkey_name(&from), monkey_name(&to));
+			//println!("From {} to {}", monkey_name(&from), monkey_name(&to));
 			match monkey_hash.entry(from) {
 				Entry::Vacant(_) => return invalid_not_found(from),
 				Entry::Occupied(mut m) =>
@@ -153,7 +153,6 @@ fn main() -> Result<(), Error> {
 	};
 
 	while !monkey_queue.is_empty() {
-		println!("BAOFFSDF");
 		for name in std::mem::take(&mut monkey_queue) {
 			let value = match monkey_hash[&name].data {
 				MonkeyData::Literal(i) => { i },
@@ -170,17 +169,17 @@ fn main() -> Result<(), Error> {
 				},
 				_ => panic!("Bad queue")
 			};
-			if name == *b"root" { // DONE
+			if name == KING { // DONE
 				println!("{}", value);
 				return Ok(())
 			}
-			println!("Check {}, {:?}", monkey_name(&name), monkey_hash[&name].next);
+			//println!("Check {}, {:?}", monkey_name(&name), monkey_hash[&name].next);
 			if let Some(next) = monkey_hash[&name].next {
 				let next_monkey = monkey_hash.get_mut(&next).unwrap();
 				match &mut next_monkey.data {
 					MonkeyData::Eq(values,_) => {
 						let mut found = false;
-						for mut v in values.iter_mut() {
+						for v in values.iter_mut() {
 							if let Value::Waiting(name2) = &v {
 								if name == *name2 {
 									*v = Value::Literal(value);
