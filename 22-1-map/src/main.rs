@@ -8,7 +8,7 @@ use int_enum::IntEnum;
 use ndarray::{Array2, Axis};
 use glam::IVec2;
 
-#[repr(u8)]
+#[repr(i8)]
 #[derive(Debug,Copy,Clone,PartialEq,IntEnum)]
 enum Dir {
 	Right = 0,
@@ -28,11 +28,13 @@ impl Default for Cell { fn default() -> Self { Cell::Blank } }
 
 type Steps = u32;
 
+#[derive(Debug)]
 enum Instr {
 	Turn(bool), // true for R, false for L
 	Forward(Steps)
 }
 
+#[derive(Debug)]
 struct Player {
 	at:IVec2,
 	dir:Dir
@@ -46,9 +48,9 @@ fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
 
 	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
-	fn within (at:IVec2, size:IVec2) -> bool {
-  		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
-  	}
+	//fn within (at:IVec2, size:IVec2) -> bool {
+  	//	IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
+  	//}
 
 	let (map, map_max, mut player, instructions) = {
 		let filename = args.nth(1);
@@ -63,7 +65,7 @@ fn main() -> Result<(), Error> {
 
 		let mut map: Array2<Cell>;
 		let mut max:IVec2 = IVec2::ZERO;
-		let mut player: Player;
+		let player: Player;
 		{
 			let mut sparse_map: HashMap<IVec2, Cell> = Default::default();
 			let mut player_at: Option<IVec2> = None;
@@ -101,6 +103,9 @@ fn main() -> Result<(), Error> {
 			map = Array2::default(to_index(max + IVec2::ONE));
 			for (at,cell) in sparse_map {
 				map[to_index(at)] = cell;
+			}
+			#[cfg(debug_assertions)] {
+				map[to_index(player.at)] = Cell::FloorRecord(player.dir);
 			}
 		}
 
@@ -145,6 +150,9 @@ fn main() -> Result<(), Error> {
 		(map, max, player, instructions)
 	};
 
+	#[cfg(debug_assertions)]
+	let mut map = map;
+
 	fn dir_char(dir:Dir) -> char {
 		match dir {
 			Dir::Right => '>',
@@ -154,7 +162,7 @@ fn main() -> Result<(), Error> {
 		}
 	}
 
-	fn print_map(map: Array2<Cell>, player:Option<Player>) {
+	fn print_map(map: &Array2<Cell>, player:Option<&Player>) {
 		use ansi_term::Style;
 		use ansi_term::Colour::{Black, White};
 
@@ -181,9 +189,51 @@ fn main() -> Result<(), Error> {
 		println!("");
 	}
 
-	print_map(map, Some(player));
+	//print_map(&map, Some(&player));
 
-	let mut total: i64 = 0;
+	let cardinals = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0), IVec2::new(0,-1)];
+
+	for instr in instructions {
+		match instr {
+			Instr::Turn(dir) => {
+				player.dir = Dir::from_int(((player.dir as i8) + if dir { 1 } else { -1 }).rem_euclid(4)).unwrap()
+			},
+			Instr::Forward(mut steps) => {
+				let mut next = player.at;
+				let step = cardinals[player.dir as usize];
+				loop {
+					if steps <= 0 { break }
+					//print_map(&map, Some(&player));println!("---------");
+
+					next += step;
+					next = IVec2::new(next.x.rem_euclid(map_max.x), next.y.rem_euclid(map_max.y));
+					if next == player.at { panic!("NO FLOORS?!") }
+					match map[to_index(next)] {
+						#[cfg(debug_assertions)]
+						Cell::FloorRecord(_) |
+						Cell::Floor => {
+							player.at = next;
+
+							steps -= 1;
+							#[cfg(debug_assertions)] {
+								map[to_index(next)] = Cell::FloorRecord(player.dir);	
+							}
+
+							continue
+						}
+						Cell::Wall => {
+							break
+						}
+						_ => ()
+					}
+				}
+			}
+		}
+	}
+
+	print_map(&map, Some(&player));
+
+	let total: i64 = 0;
 
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
