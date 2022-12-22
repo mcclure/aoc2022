@@ -2,7 +2,6 @@
 
 use std::io::{BufRead, BufReader, Error, ErrorKind, Stdin, stdin};
 use std::fs::File;
-use std::cmp;
 use either::Either;
 
 type Num = i32;
@@ -48,7 +47,18 @@ fn main() -> Result<(), Error> {
 		};
 		let pair = *pair;
 		let current_index = current_index as i32;
-		let new_index = (current_index + value).rem_euclid(nlen);
+		let new_index = current_index + value;
+		// This isn't a normal modulo, it bumps on wrap
+		let new_index = 
+			if new_index < 0 {
+				let offset = (-new_index) / nlen + 1;
+				(new_index - offset).rem_euclid(nlen)
+			} else if new_index >= nlen {
+				let offset = (new_index) / nlen;
+				(new_index + offset).rem_euclid(nlen)
+			} else {
+				new_index
+			};
 
 		// Reseat
 		if current_index != new_index {
@@ -67,7 +77,17 @@ fn main() -> Result<(), Error> {
 		#[cfg(debug_assertions)] { print(&numbers); }
 	}
 
+	let zero_at = numbers.iter().position(|(_,x)|*x==0).unwrap(); // Succeeds or corrupt array
+	let probes:Vec<i32> = vec![1000,2000,3000];
+
 	let mut total: i64 = 0;
+
+	for probe in probes {
+		let (_, v) = numbers[(zero_at + (probe as usize))%numbers.len()];
+		print!("{}, ", v);
+		total += v as i64;
+	}
+	println!("=");
 
 //	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
 
