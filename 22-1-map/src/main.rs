@@ -236,9 +236,7 @@ fn main() -> Result<(), Error> {
 
 	print_map(&map, Some(&player));
 
-	let total: i64 = 0;
-
-//	let invalid = || { return Err(Error::new(ErrorKind::InvalidInput, "Expecting other")) };
+	let total: i64 = (player.at.y+1) as i64*1000 + (player.at.x+1) as i64*4 + player.dir as i64;
 
 	// Final score
 	println!("{}", total);
