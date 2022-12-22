@@ -52,7 +52,7 @@ fn main() -> Result<(), Error> {
   	//	IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
   	//}
 
-	let (map, map_max, mut player, instructions) = {
+	let (map, map_size, mut player, instructions) = {
 		let filename = args.nth(1);
 		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
@@ -64,11 +64,12 @@ fn main() -> Result<(), Error> {
 		let invalid_blank = ||Err(Error::new(ErrorKind::InvalidInput, "No instructions at end of file"));
 
 		let mut map: Array2<Cell>;
-		let mut max:IVec2 = IVec2::ZERO;
+		let size:IVec2;
 		let player: Player;
 		{
 			let mut sparse_map: HashMap<IVec2, Cell> = Default::default();
 			let mut player_at: Option<IVec2> = None;
+			let mut max:IVec2 = IVec2::ZERO;
 
 			loop {
 				if let Some((y,line)) = lines.next() {
@@ -100,7 +101,9 @@ fn main() -> Result<(), Error> {
 			if player_at.is_none() { return Err(Error::new(ErrorKind::InvalidInput, "No floors in grid")) }
 			player = Player::new(player_at.unwrap());
 
-			map = Array2::default(to_index(max + IVec2::ONE));
+			size = max + IVec2::ONE;
+
+			map = Array2::default(to_index(size));
 			for (at,cell) in sparse_map {
 				map[to_index(at)] = cell;
 			}
@@ -147,7 +150,7 @@ fn main() -> Result<(), Error> {
 			}
 		}
 
-		(map, max, player, instructions)
+		(map, size, player, instructions)
 	};
 
 	#[cfg(debug_assertions)]
@@ -206,7 +209,7 @@ fn main() -> Result<(), Error> {
 					//print_map(&map, Some(&player));println!("---------");
 
 					next += step;
-					next = IVec2::new(next.x.rem_euclid(map_max.x), next.y.rem_euclid(map_max.y));
+					next = IVec2::new(next.x.rem_euclid(map_size.x), next.y.rem_euclid(map_size.y));
 					if next == player.at { panic!("NO FLOORS?!") }
 					match map[to_index(next)] {
 						#[cfg(debug_assertions)]
