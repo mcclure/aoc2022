@@ -17,12 +17,14 @@ enum Dir {
 	Up = 3
 }
 
+#[derive(Debug,Copy,Clone,PartialEq)]
 enum Cell {
 	Blank,
 	Floor,
 	Wall,
 	#[cfg(debug_assertions)] FloorRecord(Dir)
 }
+impl Default for Cell { fn default() -> Self { Cell::Blank } }
 
 type Steps = u32;
 
@@ -35,7 +37,12 @@ fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
 	let mut args = std::env::args().fuse();
 
-	let (map, instructions) = {
+	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
+	fn within (at:IVec2, size:IVec2) -> bool {
+  		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
+  	}
+
+	let (map, map_max, instructions) = {
 		let filename = args.nth(1);
 		let input: Either<BufReader<Stdin>, BufReader<File>> = match filename.as_deref() {
 			None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename or -")),
@@ -46,9 +53,10 @@ fn main() -> Result<(), Error> {
 
 		let invalid_blank = ||Err(Error::new(ErrorKind::InvalidInput, "No instructions at end of file"));
 
-		let map: Array2<Cell>;
+		let mut map: Array2<Cell>;
+		let mut max:IVec2 = IVec2::ZERO;
 		{
-			let sparse_map: HashMap<IVec2, Cell> = Default::default();
+			let mut sparse_map: HashMap<IVec2, Cell> = Default::default();
 
 			loop {
 				if let Some((y,line)) = lines.next() {
@@ -56,14 +64,27 @@ fn main() -> Result<(), Error> {
 					let line = line.trim_end();
 					if line.is_empty() { break } // NOT DONE
 
-					for (x,ch) in line.chars().enumerate() {
-
+					'ch: for (x,ch) in line.chars().enumerate() {
+						let cell = match ch {
+							'.' => Cell::Floor,
+							'#' => Cell::Wall,
+							' ' => continue 'ch,
+							_ => return Err(Error::new(ErrorKind::InvalidInput, format!("Unrecognized character '{}'", ch)))
+						};
+						let at = IVec2::new(x as i32,y as i32);
+						sparse_map.insert(at, cell);
+						max = max.max(at);
 					}
 
 					// TODO initialize map here
 				} else {
 					return invalid_blank();
 				}
+			}
+
+			map = Array2::default(to_index(max + IVec2::ONE));
+			for (at,cell) in sparse_map {
+				map[to_index(at)] = cell;
 			}
 		}
 
@@ -105,8 +126,31 @@ fn main() -> Result<(), Error> {
 			}
 		}
 
-		(map, instructions)
+		(map, max, instructions)
 	};
+
+	fn print_map(map: Array2<Cell>) {
+		for col in map.axis_iter(Axis(0)) {
+			for cell in col.iter() {
+				print!("{}", match cell {
+					Cell::Blank => ' ',
+					Cell::Floor => '.',
+					Cell::Wall =>  '#',
+					#[cfg(debug_assertions)]
+					Cell::FloorRecord(dir) => match dir {
+						Dir::Right => '>',
+						Dir::Down => 'v',
+						Dir::Left => '<',
+						Dir::Up => '^',
+					}
+				})
+			}
+			println!("");
+		}
+		println!("");
+	}
+
+	print_map(map);
 
 	let mut total: i64 = 0;
 
