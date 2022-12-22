@@ -15,15 +15,19 @@ fn main() -> Result<(), Error> {
 		None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 1 must be filename")),
 		Some(x) => x
 	};
+
 	let filename = match args.next() {
 		None => return Err(Error::new(ErrorKind::InvalidInput, "Argument 2 must be filename")),
 		Some(x) => x
 	};
 
 	// Non-whitespace characters
+	/*
 	let file_len = std::fs::read_to_string(&filename);
 	let file_len = file_len?.trim().len();
 	if file_len == 0 { return Err(Error::new(ErrorKind::InvalidInput, "File empty?")) }
+	*/
+	let file_len = 1; // This was a dead end
 
 	let check_count = match match args.next() {
 		Some(x) => Some(x.parse::<u64>().map_err(|_|Error::new(ErrorKind::InvalidInput, "Argument 3 must be positive number"))?),
@@ -87,10 +91,11 @@ fn main() -> Result<(), Error> {
 
 	let mut total: u64 = 0;
 
-	let time = TARGET_TIME - offset;
+	let time = TARGET_TIME - (offset - 1);
 	total += prefix_total;
-	total += (TARGET_TIME / modulus) * loop_total;
-	let leftover = TARGET_TIME % modulus;
+
+	total += (time / modulus) * loop_total;
+	let leftover = time % modulus;
 	for idx in 0..leftover {
 		total += checks[(offset + idx) as usize];
 	}
