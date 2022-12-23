@@ -50,10 +50,20 @@ fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
 	let mut args = std::env::args().fuse();
 
-	let cube_face: [[u8;4];3] = [
+	// 1-indexed, is that a problem?
+	const CUBE_FACE_BYTES: [[u8;4];3] = [
 		*b"  1 ",
 		*b"234 ",
 		*b"  56"];
+	const CUBE_FACE_BYTES_SIZE: IVec2 = IVec2::new(4,3);
+	fn cube_face_at(face:u8) -> IVec2 {
+		const AT:[IVec2;6] = [
+			                                  IVec2::new(0,2),
+			IVec2::new(1,0), IVec2::new(1,1), IVec2::new(1,2),
+			                                  IVec2::new(2,2), IVec2::new(3,2)
+		];
+		return AT[face as usize - 1]
+	}
 	fn dir_reverse(d:Dir) -> Dir {
 		match d {
 			Dir::Left => Dir::Right,
@@ -71,21 +81,35 @@ fn main() -> Result<(), Error> {
 			(3, Dir::Down)  => (5, Dir::Right),
 			(4, Dir::Right) => (6, Dir::Down),
 			// REVERSE
-			(3, Dir::Down)  => (1, Dir::Left),
-			(6, Dir::Left)  => (1, Dir::Right),
-			(2, Dir::Down)  => (1, Dir::Up),
-			(6, Dir::Up)    => (2, Dir::Left),
-			(5, Dir::Up)    => (2, Dir::Down),
-			(5, Dir::Right) => (3, Dir::Down),
-			(6, Dir::Down)  => (4, Dir::Right),
+			(3, Dir::Up)    => (1, Dir::Right),
+			(6, Dir::Right) => (1, Dir::Left),
+			(2, Dir::Up)    => (1, Dir::Down),
+			(6, Dir::Down)  => (2, Dir::Right),
+			(5, Dir::Down)  => (2, Dir::Up),
+			(5, Dir::Left)  => (3, Dir::Up),
+			(6, Dir::Up)   => (4, Dir::Left),
 
 			_ => panic!("Impossible cube ?!") 
 	} }
+	fn turn_square(v:IVec2, size:IVec2, turns:i8) -> IVec2 {
+		match turns {
+			0 => v,
+			2 => size - v - IVec2::ONE,
+			1 => IVec2::new(size.y - v.y - 1, v.x),
+			3 => IVec2::new(v.y, size.x - v.x - 1),
+			_ => panic!("Turn should have been mod 4")
+		}
+	}
 
 	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
 	fn within (at:IVec2, size:IVec2) -> bool {
   		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
   	}
+
+	fn cube_face(v:IVec2) -> u8 {
+		if !within(v, CUBE_FACE_BYTES_SIZE) { panic!("cube_face bad query") }
+		return CUBE_FACE_BYTES[v.y as usize][v.x as usize] - ('0' as u8)
+	}
 
 	let (map, map_size, mut player, instructions) = {
 		let filename = args.nth(1);
@@ -191,10 +215,11 @@ fn main() -> Result<(), Error> {
 	#[cfg(debug_assertions)]
 	let mut map = map;
 
-	let tile_size = map_size.y / 3;
+	let face_size = map_size.y / 3;
+	let face_size_vec = IVec2::new(face_size, face_size);
 
 	{
-		let expected_size = IVec2::new(tile_size * 4, tile_size * 3);
+		let expected_size = IVec2::new(face_size * 4, face_size * 3);
 		if expected_size != map_size {
 			return Err(Error::new(ErrorKind::InvalidInput, format!("Unusual size, expected like {} but got {}", expected_size, map_size)))
 		}
@@ -257,7 +282,12 @@ fn main() -> Result<(), Error> {
 					next += step;
 
 					if !within(next, map_size) || map[to_index(next)] == Cell::Blank {
-						// Do something
+						let face = cube_face(last/face_size);
+						let (new_face, new_dir) = cube_face_exit((face, player.dir));
+						let turn = ((new_dir as i8) - (player.dir as i8)).rem_euclid(4);
+						let adjusted = next - cube_face_at(face);
+						let adjusted = IVec2::new(adjusted.x.rem_euclid(4), adjusted.y.rem_euclid(4));
+						next = turn_square(adjusted, face_size_vec, turn) + cube_face_at(new_face);
 					}
 
 					if next == player.at { panic!("NO FLOORS?!") }
@@ -277,7 +307,7 @@ fn main() -> Result<(), Error> {
 						Cell::Wall => {
 							break
 						}
-						_ => panic!("Unreachable")
+						_ => panic!("Unreachable") // "within" check above should have wrapped out of Blank zone
 					}
 				}
 			}
