@@ -7,7 +7,8 @@ use either::Either;
 use glam::IVec2;
 
 // Set 0 to disable
-const DEBUG_ROUND:usize = 10;
+const DEBUG_ROUND:usize = 1;
+const FINAL_ROUND:usize = 10;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
@@ -27,7 +28,7 @@ fn main() -> Result<(), Error> {
 	//fn check_pattern(prio: u8) -> [IVec2; 3] {
 	//	return PATTERN[prio as usize];
 	//}
-	const RESULT: [IVec2; 4] = [ IVec2::new(0,-1), IVec2::Y, IVec2::new(-1, 0), IVec2::X ];
+	const RESULT: [IVec2; 4] = [ IVec2::NEG_Y, IVec2::Y, IVec2::NEG_X, IVec2::X ];
 	//const check_result(prio: u8) -> IVec2 {
 	//	return RESULT[prio as usize];
 	//}
@@ -95,7 +96,8 @@ fn main() -> Result<(), Error> {
 				}
 				println!("");
 			}
-			println!("Score: {}\n", empty);
+			println!("Round: {} Score: {}\n", round, empty);
+			if round>=FINAL_ROUND { break 'round true }
 		}
 
 		// Round 2
@@ -104,6 +106,7 @@ fn main() -> Result<(), Error> {
 				let prio = (round_prio + prio_idx)%4;
 				let clear = 'clear: {
 					for check in PATTERN[prio] {
+//println!("{} [{}] to {}? {}", elf_idx, elf, elf+check, !elves_map.contains(&(elf + check)));
 						if elves_map.contains(&(elf + check)) { // Occupied, reject prio
 							break 'clear false
 						}
@@ -112,12 +115,13 @@ fn main() -> Result<(), Error> {
 				};
 				if clear {
 					let move_to = elf + RESULT[prio];
-					let occupied = elves_proposed.insert(move_to);
-					if occupied {
+					let unoccupied = elves_proposed.insert(move_to);
+//println!("{} attempted {}. {}", elf_idx, move_to, if !unoccupied { "Occupied" } else { "SUCCESS" });
+					if unoccupied {
+						elves_claim.insert(move_to, elf_idx);
+					} else {
 						elves_claim.remove(&move_to);
 						collided = true;
-					} else {
-						elves_claim.insert(move_to, elf_idx);
 					}
 					break 'prio
 				}
@@ -126,11 +130,10 @@ fn main() -> Result<(), Error> {
 
 		// Round 2.5?
 		for (move_to, elf_idx) in elves_claim {
+//println!("{} moved", elf_idx);
 			elves[elf_idx] = move_to;
 			moved = true;
 		}
-
-		if !moved { break 'round !collided }
 	} panic!("Unreachable"); };
 
 	println!("{}", if success { "SUCCESS" } else { "FAILURE" });
