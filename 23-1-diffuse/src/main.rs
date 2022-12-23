@@ -19,11 +19,14 @@ fn main() -> Result<(), Error> {
 	//fn from_prio(prio: u8) { (prio&NIB, (prio>>2)&NIB, (prio>>4)&NIB, (prio>>6)&NIB ) }
 	//fn to_prio((a,b,c,d): (u8,u8,u8,u8)) { (a&NIB) | ((b&NIB)<<2) | ((c&NIB)<<4) | ((d&NIB)<<6) }
 	//const DEFAULT_PRIO = to_prio((0,1,2,3));
-	const PATTERN: [[IVec2;3]; 4] = [
-		[IVec2::new( 0,-1), IVec2::new( 1,-1), IVec2::new(-1,-1)], // N, NE, NW
-		[IVec2::new( 0, 1), IVec2::new( 1, 1), IVec2::new(-1, 1)], // S, SE, SW
-		[IVec2::new(-1, 0), IVec2::new(-1,-1), IVec2::new(-1, 1)], // W, NW, SW
-		[IVec2::new( 0, 1), IVec2::new( 1,-1), IVec2::new( 1, 1)], // E, NE, SE
+	// Clockwise
+	const COMPASS: [IVec2;8] = [IVec2::new( 0,-1), IVec2::new( 1,-1), IVec2::new( 0, 1), IVec2::new( 1, 1),  // 0:N 1:NE 2:E 3:SE
+	                 IVec2::new( 0, 1), IVec2::new(-1, 1), IVec2::new(-1, 0), IVec2::new(-1,-1)]; // 4:S 5:SW 6:W 7:NW
+	const PATTERN: [[usize;3]; 4] = [
+		[0, 1, 7], // N, NE, NW
+		[4, 3, 5], // S, SE, SW
+		[6, 7, 5], // W, NW, SW
+		[2, 1, 3], // E, NE, SE
 	];
 	//fn check_pattern(prio: u8) -> [IVec2; 3] {
 	//	return PATTERN[prio as usize];
@@ -79,79 +82,97 @@ fn main() -> Result<(), Error> {
 		println!("\tRound: {} Score: {}\n", round, empty);
 	}
 
-	let success = 'round: { for round in 0.. {
-		let mut elves_map:HashSet<IVec2> = Default::default();
-		let mut elves_min = IVec2::new(i32::MAX, i32::MAX);
-		let mut elves_max = IVec2::new(i32::MIN, i32::MIN);
-		let mut elves_proposed:HashSet<IVec2> = Default::default();
-		let mut elves_claim:HashMap<IVec2, usize> = Default::default();
-		let round_prio = round % 4;
+	let success = 'round: {
 		let mut last_moved: isize = -1;
-		let mut last_collided: isize = -1;
+		for round in 0..(isize::MAX as usize) {
+			let mut elves_map:HashSet<IVec2> = Default::default();
+			let mut elves_min = IVec2::new(i32::MAX, i32::MAX);
+			let mut elves_max = IVec2::new(i32::MIN, i32::MIN);
+			let mut elves_proposed:HashSet<IVec2> = Default::default();
+			let mut elves_claim:HashMap<IVec2, usize> = Default::default();
+			let round_prio = round % 4;
+			let mut any_crowded = false;
 
-		// Round 1
-		for &elf in elves.iter() {
-			elves_min = elves_min.min(elf);
-			elves_max = elves_max.max(elf);
-			elves_map.insert(elf);
-		}
+			// Round 1
+			for &elf in elves.iter() {
+				elves_min = elves_min.min(elf);
+				elves_max = elves_max.max(elf);
+				elves_map.insert(elf);
+			}
 
-		// Non-round: Debug printouts
-		// So the math works, do this after building elves_map but before any mutation
-		// (IE print on round 10 means "print after 10 rounds...")
-		if DEBUG_ROUND > 0 && round % DEBUG_ROUND == 0 {
-			print_elves(round, &elves_map, elves_min, elves_max);
-			if FINAL_ROUND>0 && round>=FINAL_ROUND { break 'round true }
-		}
+			// Non-round: Debug printouts
+			// So the math works, do this after building elves_map but before any mutation
+			// (IE print on round 10 means "print after 10 rounds...")
+			if DEBUG_ROUND > 0 && round % DEBUG_ROUND == 0 {
+				print_elves(round, &elves_map, elves_min, elves_max);
+				if FINAL_ROUND>0 && round>=FINAL_ROUND { break 'round true }
+			}
 
-		// Round 2
-		for (elf_idx, &elf) in elves.iter().enumerate() {
-			'prio: for prio_idx in 0..4 {
-				let prio = (round_prio + prio_idx)%4;
-				let clear = 'clear: {
-					for check in PATTERN[prio] {
-//println!("{} [{}] to {}? {}", elf_idx, elf, elf+check, !elves_map.contains(&(elf + check)));
-						if elves_map.contains(&(elf + check)) { // Occupied, reject prio
-							break 'clear false
+			// Round 2
+			'elf: for (elf_idx, &elf) in elves.iter().enumerate() {
+				let mut all_unoccupied = true;
+				let compass_occupied = COMPASS.map(|v| {
+					let occupied = elves_map.contains(&(elf + v));
+					all_unoccupied = all_unoccupied && !occupied;
+					occupied
+				});
+
+				if all_unoccupied { continue 'elf }
+				any_crowded = true;
+
+				'prio: for prio_idx in 0..4 {
+					let prio = (round_prio + prio_idx)%4;
+					let clear = 'clear: {
+						for check in PATTERN[prio] {
+	//println!("{} [{}] to {}? {}", elf_idx, elf, elf+check, !elves_map.contains(&(elf + check)));
+							if compass_occupied[check] { // Occupied, reject prio
+								break 'clear false
+							}
 						}
+						true
+					};
+					if clear {
+						let move_to = elf + RESULT[prio];
+						let unoccupied = elves_proposed.insert(move_to);
+	//println!("{} attempted {}. {}", elf_idx, move_to, if !unoccupied { "Occupied" } else { "SUCCESS" });
+						if unoccupied {
+							elves_claim.insert(move_to, elf_idx);
+						} else {
+							elves_claim.remove(&move_to);
+						}
+						break 'prio
 					}
-					true
-				};
-				if clear {
-					let move_to = elf + RESULT[prio];
-					let unoccupied = elves_proposed.insert(move_to);
-//println!("{} attempted {}. {}", elf_idx, move_to, if !unoccupied { "Occupied" } else { "SUCCESS" });
-					if unoccupied {
-						elves_claim.insert(move_to, elf_idx);
-					} else {
-						elves_claim.remove(&move_to);
-						last_collided = round as isize;
+				}
+			}
+
+			// Round 2.5?
+			for (move_to, elf_idx) in elves_claim {
+	//println!("{} moved", elf_idx);
+				elves[elf_idx] = move_to;
+				last_moved = round as isize;
+			}
+
+			{
+				let (mut done, mut success) = (false, false);
+				if !any_crowded { // Nobody needed to move this round.
+					success = true; done = true;
+					println!("No moves needed.");
+				} else if round >= 4 {
+					let iround = round as isize;
+					let since_moved = iround - last_moved;
+					if since_moved >= 4 {
+						success = false; done = true;
+						println!("No remaining moves.");
 					}
-					break 'prio
+				}
+				if done {
+					break 'round success
 				}
 			}
 		}
-
-		// Round 2.5?
-		for (move_to, elf_idx) in elves_claim {
-//println!("{} moved", elf_idx);
-			elves[elf_idx] = move_to;
-			last_moved = round as isize;
-		}
-
-		if round >= 4 {
-			let iround = round as isize;
-			let (since_moved, since_collided) = (iround - last_moved, iround - last_collided);
-			let (mut done, mut success) = (false, false);
-			if since_collided >= 4   { success = true;  done = true }
-			else if since_moved >= 4 { success = false; done = true }
-			if done {
-				print_elves(round, &elves_map, elves_min, elves_max);
-				println!("No remaining moves.");
-				break 'round success
-			}
-		}
-	} panic!("Unreachable"); };
+		println!("This is taking too long."); // Exceeded SIZE_MAX?!
+		false
+	};
 
 	println!("{}", if success { "SUCCESS" } else { "FAILURE" });
 
