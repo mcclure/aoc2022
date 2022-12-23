@@ -50,29 +50,24 @@ fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
 	let mut args = std::env::args().fuse();
 
-	// 1-indexed, is that a problem?
+	#[cfg(not(any(topology="0", topology="1")))]
+	compile_error!("Pass --cfg topology=0 or --cfg topology=1 when building.");
+
+	// Faces are 1-indexed, is that a problem?
+	#[cfg(topology="0")]
 	const CUBE_FACE_BYTES: [[u8;4];3] = [
 		*b"  1 ",
 		*b"234 ",
 		*b"  56"];
+	#[cfg(topology="0")]
 	const CUBE_FACE_BYTES_SIZE: IVec2 = IVec2::new(4,3);
-	fn cube_face_at(face:u8) -> IVec2 {
-		const AT:[IVec2;6] = [
-			                                  IVec2::new(2,0),
-			IVec2::new(0,1), IVec2::new(1,1), IVec2::new(2,1),
-			                                  IVec2::new(2,2), IVec2::new(3,2)
-		];
-		return AT[face as usize - 1]
-	}
-	#[cfg(unused)]
-	fn dir_reverse(d:Dir) -> Dir {
-		match d {
-			Dir::Left => Dir::Right,
-			Dir::Down => Dir::Up,
-			Dir::Right => Dir::Left,
-			Dir::Up => Dir::Down
-		}
-	}
+	#[cfg(topology="0")]
+	const FACE_AT:[IVec2;6] = [
+		                                  IVec2::new(2,0),
+		IVec2::new(0,1), IVec2::new(1,1), IVec2::new(2,1),
+		                                  IVec2::new(2,2), IVec2::new(3,2)
+	];
+	#[cfg(topology="0")]
 	fn cube_face_exit(x: (u8, Dir)) -> (u8, Dir) { match x {
 			(1, Dir::Left)  => (3, Dir::Down),
 			(1, Dir::Right) => (6, Dir::Left),
@@ -92,6 +87,56 @@ fn main() -> Result<(), Error> {
 
 			_ => panic!("Impossible cube ?! {:?}", x) 
 	} }
+
+	// Faces are 1-indexed, is that a problem?
+	#[cfg(topology="1")]
+	const CUBE_FACE_BYTES: [[u8;3];4] = [
+		*b" 12",
+		*b" 3 ",
+		*b"45 ",
+		*b"6  "];
+	#[cfg(topology="1")]
+	const CUBE_FACE_BYTES_SIZE: IVec2 = IVec2::new(3,4);
+	#[cfg(topology="1")]
+	const FACE_AT:[IVec2;6] = [
+		                 IVec2::new(1,0), IVec2::new(2,0),
+		                 IVec2::new(1,1),
+		IVec2::new(0,2), IVec2::new(1,2),
+		IVec2::new(0,3)
+	];
+	#[cfg(topology="1")]
+	fn cube_face_exit(x: (u8, Dir)) -> (u8, Dir) { match x {
+			(1, Dir::Left)  => (4, Dir::Right),
+			(1, Dir::Up)    => (6, Dir::Right),
+			(2, Dir::Up)    => (6, Dir::Up),
+			(2, Dir::Right) => (5, Dir::Left),
+			(3, Dir::Right) => (2, Dir::Up),
+			(3, Dir::Left)  => (4, Dir::Down),
+			(5, Dir::Down)  => (6, Dir::Left),
+			// REVERSE
+			(4, Dir::Left)  => (1, Dir::Right),
+			(6, Dir::Left)  => (1, Dir::Down),
+			(6, Dir::Down)  => (2, Dir::Down),
+			(5, Dir::Right) => (2, Dir::Left),
+			(2, Dir::Down)  => (3, Dir::Left),
+			(4, Dir::Up)    => (3, Dir::Right),
+			(6, Dir::Right) => (5, Dir::Up),
+
+			_ => panic!("Impossible cube ?! {:?}", x) 
+	} }
+
+	fn cube_face_at(face:u8) -> IVec2 {
+		return FACE_AT[face as usize - 1]
+	}
+	#[cfg(unused)]
+	fn dir_reverse(d:Dir) -> Dir {
+		match d {
+			Dir::Left => Dir::Right,
+			Dir::Down => Dir::Up,
+			Dir::Right => Dir::Left,
+			Dir::Up => Dir::Down
+		}
+	}
 	fn turn_square(v:IVec2, size:IVec2, turns:i8) -> IVec2 {
 		match turns {
 			0 => v,
@@ -216,11 +261,11 @@ fn main() -> Result<(), Error> {
 	#[cfg(debug_assertions)]
 	let mut map = map;
 
-	let face_size = map_size.y / 3;
+	let face_size = map_size.y / CUBE_FACE_BYTES_SIZE.y;
 	let face_size_vec = IVec2::new(face_size, face_size);
 
 	{
-		let expected_size = IVec2::new(face_size * 4, face_size * 3);
+		let expected_size = face_size * CUBE_FACE_BYTES_SIZE;
 		if expected_size != map_size {
 			return Err(Error::new(ErrorKind::InvalidInput, format!("Unusual size, expected like {} but got {}", expected_size, map_size)))
 		}
@@ -267,7 +312,7 @@ fn main() -> Result<(), Error> {
 	let cardinals = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0), IVec2::new(0,-1)];
 
 	for instr in instructions {
-#[cfg(debug_assertions)] if DEBUG_STEP { print_map(&map, Some(&player));println!("---------"); }
+#[cfg(debug_assertions)] if DEBUG_STEP { print_map(&map, Some(&player));println!("\n---------\nSTEP: {:?}\n", instr); }
 		match instr {
 			Instr::Turn(dir) => {
 				player.dir = Dir::from_int(((player.dir as i8) + if dir { 1 } else { -1 }).rem_euclid(4)).unwrap()
@@ -318,7 +363,7 @@ fn main() -> Result<(), Error> {
 						Cell::Wall => {
 							break
 						}
-						_ => panic!("Unreachable") // "within" check above should have wrapped out of Blank zone
+						_ => panic!("Fell into void, problem with within() check") // check should have wrapped out of Blank zone
 					}
 				}
 			}

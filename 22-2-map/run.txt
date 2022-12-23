@@ -1,0 +1,1 @@
+cargo.exe rustc -- --cfg 'topology="1"' && ./target/debug/map.exe ../22-1-map/data/cube1.txt
