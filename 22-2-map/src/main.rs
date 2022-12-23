@@ -58,12 +58,13 @@ fn main() -> Result<(), Error> {
 	const CUBE_FACE_BYTES_SIZE: IVec2 = IVec2::new(4,3);
 	fn cube_face_at(face:u8) -> IVec2 {
 		const AT:[IVec2;6] = [
-			                                  IVec2::new(0,2),
-			IVec2::new(1,0), IVec2::new(1,1), IVec2::new(1,2),
+			                                  IVec2::new(2,0),
+			IVec2::new(0,1), IVec2::new(1,1), IVec2::new(2,1),
 			                                  IVec2::new(2,2), IVec2::new(3,2)
 		];
 		return AT[face as usize - 1]
 	}
+	#[cfg(unused)]
 	fn dir_reverse(d:Dir) -> Dir {
 		match d {
 			Dir::Left => Dir::Right,
@@ -89,7 +90,7 @@ fn main() -> Result<(), Error> {
 			(5, Dir::Left)  => (3, Dir::Up),
 			(6, Dir::Up)   => (4, Dir::Left),
 
-			_ => panic!("Impossible cube ?!") 
+			_ => panic!("Impossible cube ?! {:?}", x) 
 	} }
 	fn turn_square(v:IVec2, size:IVec2, turns:i8) -> IVec2 {
 		match turns {
@@ -161,7 +162,7 @@ fn main() -> Result<(), Error> {
 			player = Player::new(player_at.unwrap());
 
 			size = max + IVec2::ONE;
-
+//println!("MAX {} SIZE {}", max, size);
 			map = Array2::default(to_index(size));
 			for (at,cell) in sparse_map {
 				map[to_index(at)] = cell;
@@ -266,28 +267,37 @@ fn main() -> Result<(), Error> {
 	let cardinals = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0), IVec2::new(0,-1)];
 
 	for instr in instructions {
+#[cfg(debug_assertions)] if DEBUG_STEP { print_map(&map, Some(&player));println!("---------"); }
 		match instr {
 			Instr::Turn(dir) => {
 				player.dir = Dir::from_int(((player.dir as i8) + if dir { 1 } else { -1 }).rem_euclid(4)).unwrap()
 			},
 			Instr::Forward(mut steps) => {
 				let mut next = player.at;
-				let step = cardinals[player.dir as usize];
+				let mut next_dir = player.dir;
 				loop {
 					if steps <= 0 { break }
 
-					#[cfg(debug_assertions)] if DEBUG_STEP { print_map(&map, Some(&player));println!("---------"); }
-
 					let last = next;
-					next += step;
+					next += cardinals[next_dir as usize];
 
 					if !within(next, map_size) || map[to_index(next)] == Cell::Blank {
+//println!("Will wrap at {}", next);
 						let face = cube_face(last/face_size);
-						let (new_face, new_dir) = cube_face_exit((face, player.dir));
-						let turn = ((new_dir as i8) - (player.dir as i8)).rem_euclid(4);
-						let adjusted = next - cube_face_at(face);
-						let adjusted = IVec2::new(adjusted.x.rem_euclid(4), adjusted.y.rem_euclid(4));
-						next = turn_square(adjusted, face_size_vec, turn) + cube_face_at(new_face);
+						let (new_face, new_dir) = cube_face_exit((face, next_dir));
+						let turn = ((new_dir as i8) - (next_dir as i8)).rem_euclid(4);
+//println!("Leaving face {}, dir {:?} into face {}, dir {:?}, turn {}", face, next_dir, new_face, new_dir, turn);
+//println!("Pre wrap:"); print_map(&map, Some(&Player{at:next, dir:next_dir}));
+						let adjusted = next - cube_face_at(face)*face_size;
+//println!("Defaced:"); print_map(&map, Some(&Player{at:adjusted, dir:next_dir}));
+						let adjusted = IVec2::new(adjusted.x.rem_euclid(face_size), adjusted.y.rem_euclid(face_size));
+//println!("Wrapped:"); print_map(&map, Some(&Player{at:adjusted, dir:next_dir}));
+						let adjusted = turn_square(adjusted, face_size_vec, turn);
+						next_dir = new_dir;
+//println!("Turned:"); print_map(&map, Some(&Player{at:adjusted, dir:next_dir}));
+						next = adjusted + cube_face_at(new_face)*face_size;
+//println!("Refaced:"); print_map(&map, Some(&Player{at:next, dir:next_dir}));
+//println!("Standing on: {:?}", map[to_index(next)]);
 					}
 
 					if next == player.at { panic!("NO FLOORS?!") }
@@ -296,6 +306,7 @@ fn main() -> Result<(), Error> {
 						Cell::FloorRecord(_) |
 						Cell::Floor => {
 							player.at = next;
+							player.dir = next_dir;
 
 							steps -= 1;
 							#[cfg(debug_assertions)] {
