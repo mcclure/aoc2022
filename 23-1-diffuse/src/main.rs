@@ -8,7 +8,7 @@ use glam::IVec2;
 
 // Set 0 to disable
 const DEBUG_ROUND:usize = 1;
-const FINAL_ROUND:usize = 10;
+const FINAL_ROUND:usize = 0;
 
 fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
@@ -61,6 +61,24 @@ fn main() -> Result<(), Error> {
 
 	if elves.is_empty() { return Err(Error::new(ErrorKind::InvalidInput, "No elves?")) }
 
+	fn print_elves(round:usize, elves_map: &HashSet<IVec2>, elves_min: IVec2, elves_max: IVec2) {
+		let mut empty = 0;
+		for y in elves_min.y..=elves_max.y {
+			for x in elves_min.x..=elves_max.x {
+				print!("{}",
+					if elves_map.contains(&IVec2::new(x,y)) {
+						'#'
+					} else {
+						empty += 1;
+						'.'
+					}
+				)
+			}
+			println!("");
+		}
+		println!("\tRound: {} Score: {}\n", round, empty);
+	}
+
 	let success = 'round: { for round in 0.. {
 		let mut elves_map:HashSet<IVec2> = Default::default();
 		let mut elves_min = IVec2::new(i32::MAX, i32::MAX);
@@ -68,8 +86,8 @@ fn main() -> Result<(), Error> {
 		let mut elves_proposed:HashSet<IVec2> = Default::default();
 		let mut elves_claim:HashMap<IVec2, usize> = Default::default();
 		let round_prio = round % 4;
-		let mut moved = false;
-		let mut collided = false;
+		let mut last_moved: isize = -1;
+		let mut last_collided: isize = -1;
 
 		// Round 1
 		for &elf in elves.iter() {
@@ -82,22 +100,8 @@ fn main() -> Result<(), Error> {
 		// So the math works, do this after building elves_map but before any mutation
 		// (IE print on round 10 means "print after 10 rounds...")
 		if DEBUG_ROUND > 0 && round % DEBUG_ROUND == 0 {
-			let mut empty = 0;
-			for y in elves_min.y..=elves_max.y {
-				for x in elves_min.x..=elves_max.x {
-					print!("{}",
-						if elves.contains(&IVec2::new(x,y)) {
-							'#'
-						} else {
-							empty += 1;
-							'.'
-						}
-					)
-				}
-				println!("");
-			}
-			println!("Round: {} Score: {}\n", round, empty);
-			if round>=FINAL_ROUND { break 'round true }
+			print_elves(round, &elves_map, elves_min, elves_max);
+			if FINAL_ROUND>0 && round>=FINAL_ROUND { break 'round true }
 		}
 
 		// Round 2
@@ -121,7 +125,7 @@ fn main() -> Result<(), Error> {
 						elves_claim.insert(move_to, elf_idx);
 					} else {
 						elves_claim.remove(&move_to);
-						collided = true;
+						last_collided = round as isize;
 					}
 					break 'prio
 				}
@@ -132,7 +136,20 @@ fn main() -> Result<(), Error> {
 		for (move_to, elf_idx) in elves_claim {
 //println!("{} moved", elf_idx);
 			elves[elf_idx] = move_to;
-			moved = true;
+			last_moved = round as isize;
+		}
+
+		if round >= 4 {
+			let iround = round as isize;
+			let (since_moved, since_collided) = (iround - last_moved, iround - last_collided);
+			let (mut done, mut success) = (false, false);
+			if since_collided >= 4   { success = true;  done = true }
+			else if since_moved >= 4 { success = false; done = true }
+			if done {
+				print_elves(round, &elves_map, elves_min, elves_max);
+				println!("No remaining moves.");
+				break 'round success
+			}
 		}
 	} panic!("Unreachable"); };
 
