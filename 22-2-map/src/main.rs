@@ -50,10 +50,42 @@ fn main() -> Result<(), Error> {
     // Load file from command-line argument or (if -) stdin
 	let mut args = std::env::args().fuse();
 
+	let cube_face: [[u8;4];3] = [
+		*b"  1 ",
+		*b"234 ",
+		*b"  56"];
+	fn dir_reverse(d:Dir) -> Dir {
+		match d {
+			Dir::Left => Dir::Right,
+			Dir::Down => Dir::Up,
+			Dir::Right => Dir::Left,
+			Dir::Up => Dir::Down
+		}
+	}
+	fn cube_face_exit(x: (u8, Dir)) -> (u8, Dir) { match x {
+			(1, Dir::Left)  => (3, Dir::Down),
+			(1, Dir::Right) => (6, Dir::Left),
+			(1, Dir::Up)    => (2, Dir::Down),
+			(2, Dir::Left)  => (6, Dir::Up),
+			(2, Dir::Down)  => (5, Dir::Up),
+			(3, Dir::Down)  => (5, Dir::Right),
+			(4, Dir::Right) => (6, Dir::Down),
+			// REVERSE
+			(3, Dir::Down)  => (1, Dir::Left),
+			(6, Dir::Left)  => (1, Dir::Right),
+			(2, Dir::Down)  => (1, Dir::Up),
+			(6, Dir::Up)    => (2, Dir::Left),
+			(5, Dir::Up)    => (2, Dir::Down),
+			(5, Dir::Right) => (3, Dir::Down),
+			(6, Dir::Down)  => (4, Dir::Right),
+
+			_ => panic!("Impossible cube ?!") 
+	} }
+
 	fn to_index(v:IVec2) -> (usize, usize) { (v.y as usize, v.x as usize) }
-	//fn within (at:IVec2, size:IVec2) -> bool {
-  	//	IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
-  	//}
+	fn within (at:IVec2, size:IVec2) -> bool {
+  		IVec2::ZERO.cmple(at).all() && size.cmpgt(at).all()
+  	}
 
 	let (map, map_size, mut player, instructions) = {
 		let filename = args.nth(1);
@@ -159,6 +191,15 @@ fn main() -> Result<(), Error> {
 	#[cfg(debug_assertions)]
 	let mut map = map;
 
+	let tile_size = map_size.y / 3;
+
+	{
+		let expected_size = IVec2::new(tile_size * 4, tile_size * 3);
+		if expected_size != map_size {
+			return Err(Error::new(ErrorKind::InvalidInput, format!("Unusual size, expected like {} but got {}", expected_size, map_size)))
+		}
+	}
+
 	fn dir_char(dir:Dir) -> char {
 		match dir {
 			Dir::Right => '>',
@@ -212,8 +253,13 @@ fn main() -> Result<(), Error> {
 
 					#[cfg(debug_assertions)] if DEBUG_STEP { print_map(&map, Some(&player));println!("---------"); }
 
+					let last = next;
 					next += step;
-					next = IVec2::new(next.x.rem_euclid(map_size.x), next.y.rem_euclid(map_size.y));
+
+					if !within(next, map_size) || map[to_index(next)] == Cell::Blank {
+						// Do something
+					}
+
 					if next == player.at { panic!("NO FLOORS?!") }
 					match map[to_index(next)] {
 						#[cfg(debug_assertions)]
@@ -231,7 +277,7 @@ fn main() -> Result<(), Error> {
 						Cell::Wall => {
 							break
 						}
-						_ => ()
+						_ => panic!("Unreachable")
 					}
 				}
 			}
