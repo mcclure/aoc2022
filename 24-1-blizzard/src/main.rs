@@ -96,21 +96,23 @@ fn main() -> Result<(), Error> {
 	}
 
 	let is_wall = |at:IVec2| {
-		IVec2::ZERO.cmpge(at).all() || size.cmple(at).all()
+		IVec2::ZERO.cmpge(at).any() || size.cmple(at).any()
 	};
 	let print_moment = |map: &Array2<Cell>| {
-		for (y,col) in map.axis_iter(Axis(1)).enumerate() {
-			for (x,cell) in col.iter().enumerate() {
+		for y in 0..(size.y+1) {
+			for x in 0..(size.x+1) {
 				let at = IVec2::new(x as i32,y as i32);
 				const FLOOR:char = '.';
 				print!("{}", if at == start || at == end {
 					FLOOR
 				} else if is_wall(at) {
 					'#'
-				} else if let &Cell::Blizzard(dir) = cell {
-					DIR_CHAR[dir as usize]
 				} else {
-					FLOOR
+					match map[(y as usize,x as usize)] { // NOTE REVERSE INDEX
+						Cell::Blizzard(dir) => { DIR_CHAR[dir as usize] },
+						Cell::Multi => { '2' }
+						_ => FLOOR
+					}
 				})
 			}
 			println!("");
@@ -121,7 +123,7 @@ fn main() -> Result<(), Error> {
 	fn manhattan(v:IVec2) -> i32 { v.x.abs() + v.y.abs() }
 	let mut target_time = manhattan(end-start) as usize; // Look, a "heuristic"
 
-	let timeline: Vec<Moment> = vec![Moment{ blizzards:start_blizzards, blizzards_map:start_blizzards_map }];
+	let mut timeline: Vec<Moment> = vec![Moment{ blizzards:start_blizzards, blizzards_map:start_blizzards_map }];
 	let mut wraps: HashMap<IVec2, IVec2> = Default::default();
 
 	'solved: loop {
@@ -141,6 +143,7 @@ fn main() -> Result<(), Error> {
 				} else if next.x >= size.x {
 					o = true; o_y = false; o_p = true;
 				}
+				//println!("{}, {:?}: {}, {}, {}", at, dir, o, o_y, o_p);
 
 				if o { // Wrap
 					let p = if o_p {-1} else {1};
@@ -152,14 +155,17 @@ fn main() -> Result<(), Error> {
 				}
 
 				now.blizzards.push((next, dir));
-				let at_index = to_index(at);
+				let at_index = to_index(next);
 				let cell = if now.blizzards_map[at_index] == Cell::Floor {
 					Cell::Blizzard(dir)
 				} else { Cell::Multi };
+				now.blizzards_map[at_index] = cell;
 
-				print_moment(&now.blizzards_map);
 			}
+			print_moment(&now.blizzards_map);
+			timeline.push(now);
 		}
+		break 'solved;
 	}
 
 	let total: i64 = 0;
