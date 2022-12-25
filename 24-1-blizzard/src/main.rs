@@ -30,6 +30,8 @@ impl Default for Cell { fn default() -> Self { Cell::Floor } }
 type Blizzard = (IVec2, Dir);
 type BlizzardsMap = Array2<Cell>;
 
+const DEBUG_STEPS:bool = true;
+
 fn main() -> Result<(), Error> {
 	let mut args = std::env::args().fuse();
 
@@ -103,22 +105,35 @@ fn main() -> Result<(), Error> {
 	let is_wall = |at:IVec2| { // Is outside playing field (will return true on start and end)
 		IVec2::ZERO.cmpge(at).any() || size.cmple(at).any()
 	};
-	let print_moment = |map: &BlizzardsMap| {
+	let print_moment = |map: &BlizzardsMap, player:Option<Blizzard>| { // A BLIZZARD MADE OF SKIN
+		use ansi_term::Style;
+		use ansi_term::Colour::Cyan;
+		let text = Style::new();
+		let cyan = Style::new().fg(Cyan);
+
 		for y in 0..=size.y {
 			for x in 0..=size.x {
 				let at = IVec2::new(x as i32,y as i32);
 				const FLOOR:char = '.';
-				print!("{}", if at == start || at == end {
-					FLOOR
-				} else if is_wall(at) {
-					'#'
-				} else {
-					match map[(y as usize,x as usize)] { // NOTE REVERSE INDEX
-						Cell::Blizzard(dir) => { DIR_CHAR[dir as usize] },
-						Cell::Multi => { '2' }
-						_ => FLOOR
-					}
-				})
+				print!("{}",
+					if match player { None => false, Some((player_at, _)) => at == player_at } {
+						let (_, dir) = player.unwrap();
+						cyan.paint(DIR_CHAR[dir as usize].to_string())
+					} else {
+						text.paint(
+							if at == start || at == end {
+								FLOOR
+							} else if is_wall(at) {
+								'#'
+							} else {
+								match map[(y as usize,x as usize)] { // NOTE REVERSE INDEX
+									Cell::Blizzard(dir) => { DIR_CHAR[dir as usize] },
+									Cell::Multi => { '2' }
+									_ => FLOOR
+								}
+							}
+						.to_string())
+					})
 			}
 			println!("");
 		}
@@ -220,7 +235,31 @@ fn main() -> Result<(), Error> {
 		    |&at| NotNan::new((at.truncate() - end).as_vec2().length()).unwrap(),
 		    |&at| at.truncate() == end
 		) {
-			println!("SOLUTION\n{}", path.len());
+			println!("SOLUTION");
+
+			if DEBUG_STEPS {
+				let mut last:Option<Blizzard> = None;
+				for (idx,v) in path.iter().enumerate() {
+					let at = v.truncate();
+					println!("---------\nStep {}", idx+1);
+					let player = (at, 
+						match last {
+							None => Dir::Down,
+							Some((at_old, dir_old)) => {
+								     if at_old.y < at.y { Dir::Down }
+								else if at_old.y > at.y { Dir::Up }
+								else if at_old.x < at.x { Dir::Right }
+								else if at_old.x > at.x { Dir::Left }
+								else                    { dir_old }
+							}
+						}
+					);
+					print_moment(&timeline[v.z as usize].blizzards_map, Some(player));
+					last = Some(player);
+				}
+			}
+
+			println!("{}", path.len());
 			return Ok(())
 		} else {
 			println!("{} steps wasn't enough...", target_time);
