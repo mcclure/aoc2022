@@ -1,0 +1,16 @@
+[package]
+name = "range"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi_term = "0.12.1"
+either = "1.8.0"
+glam = "0.22.0"
+int-enum = "0.5.0"
+multimap = "0.8.3"
+ndarray = "0.15.6"
+ordered-float = "3.4.0"
+pathfinding = "4.1.1"
