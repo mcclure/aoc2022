@@ -9,6 +9,8 @@ use clap::Parser;
 struct Cli {
 	#[arg(short = 'r', long = "reverse")]
 	reverse: bool,
+	#[arg(short = 's', long = "silent")]
+	silent: bool,
 	filename: Option<String>
 }
 
@@ -30,14 +32,33 @@ fn from_snafu(s:&str) -> Option<i64> {
 	Some(result)
 }
 
-fn to_snafu(i:i64) -> String {
-	"".to_string()
+fn to_snafu(mut i:i64) -> String {
+	let mut result: String = Default::default();
+	if i<0 { panic!("Currently don't support negative numbers ({})", i) }
+	if i == 0 { return "0".to_string() }
+	let mut result: Vec<char> = Default::default();
+	while i > 0 {
+		let digit = i%5;
+		let carry = i > 2;
+		result.push(match digit {
+			0 => '0',
+			1 => '1',
+			2 => '2',
+			3 => '=',
+			4 => '-',
+			_ => panic!("Unreachable")
+		});
+
+		i /= 5;
+		if carry { i += 1 }
+	}
+	result.iter().rev().collect::<String>()
 }
 
 fn main() -> Result<(), Error> {
-	let (filename, reverse) = {
+	let (filename, reverse, silent) = {
 		let cli = Cli::parse();
-		(cli.filename, cli.reverse)
+		(cli.filename, cli.reverse, cli.silent)
 	};
 
 	let mut total: i64 = 0;
@@ -60,11 +81,11 @@ fn main() -> Result<(), Error> {
 
 			let result: i64 = if reverse {
 				let result = line.parse::<i64>().map_err(|_|invalid(line))?;
-				println!("{}", to_snafu(result));
+				if !silent { println!("{}", to_snafu(result)); }
 				result
 			} else {
 				let result = from_snafu(line).ok_or_else(||invalid(line))?;
-				println!("{}", result);
+				if !silent { println!("{}", result); }
 				result
 			};
 
