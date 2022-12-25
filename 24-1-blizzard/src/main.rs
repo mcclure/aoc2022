@@ -241,7 +241,7 @@ fn main() -> Result<(), Error> {
 				let mut last:Option<Blizzard> = None;
 				for (idx,v) in path.iter().enumerate() {
 					let at = v.truncate();
-					println!("---------\nStep {}", idx+1);
+					println!("---------\nStep {}", idx);
 					let player = (at, 
 						match last {
 							None => Dir::Down,
@@ -259,7 +259,7 @@ fn main() -> Result<(), Error> {
 				}
 			}
 
-			println!("{}", path.len());
+			println!("{}", path.len()-1);
 			return Ok(())
 		} else {
 			println!("{} steps wasn't enough...", target_time);
