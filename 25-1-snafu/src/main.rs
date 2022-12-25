@@ -33,25 +33,24 @@ fn from_snafu(s:&str) -> Option<i64> {
 }
 
 fn to_snafu(mut i:i64) -> String {
-	let mut result: String = Default::default();
 	if i<0 { panic!("Currently don't support negative numbers ({})", i) }
 	if i == 0 { return "0".to_string() }
 	let mut result: Vec<char> = Default::default();
+	let mut carry = false;
 	while i > 0 {
 		let digit = i%5;
-		let carry = i > 2;
+		carry = i > 2;
+		i /= 5;
 		result.push(match digit {
 			0 => '0',
 			1 => '1',
 			2 => '2',
-			3 => '=',
-			4 => '-',
+			3 => {i -= 2; '='},
+			4 => {i -= 1; '-'},
 			_ => panic!("Unreachable")
 		});
-
-		i /= 5;
-		if carry { i += 1 }
 	}
+	if carry { result.push('1') }
 	result.iter().rev().collect::<String>()
 }
 
