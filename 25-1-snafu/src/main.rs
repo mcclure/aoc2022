@@ -13,7 +13,21 @@ struct Cli {
 }
 
 fn from_snafu(s:&str) -> Option<i64> {
-	None
+	let mut base = 1;
+	let mut result = 0;
+	for ch in s.chars().rev() {
+		let digit = match ch {
+			'=' => -2,
+			'-' => -1,
+			'0' => 0,
+			'1' => 1,
+			'2' => 2,
+			_ => return None
+		};
+		result += digit*base;
+		base *= 5;
+	}
+	Some(result)
 }
 
 fn to_snafu(i:i64) -> String {
@@ -45,7 +59,9 @@ fn main() -> Result<(), Error> {
 			let line = line.trim();
 
 			let result: i64 = if reverse {
-				0
+				let result = line.parse::<i64>().map_err(|_|invalid(line))?;
+				println!("{}", to_snafu(result));
+				result
 			} else {
 				let result = from_snafu(line).ok_or_else(||invalid(line))?;
 				println!("{}", result);
