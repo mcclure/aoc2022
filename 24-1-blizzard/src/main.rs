@@ -37,9 +37,9 @@ fn main() -> Result<(), Error> {
 	fn dir_for(ch:char) -> Option<Dir> { match ch { '>' => Some(Dir::Right), 'v' => Some(Dir::Down),
 	                                                  '<' => Some(Dir::Left), '^' => Some(Dir::Up), _ => None } }
 	const CARDINALS:[IVec2;4] = [IVec2::new(1,0), IVec2::new(0,1), IVec2::new(-1,0), IVec2::new(0,-1)];
-	const NEIGHBORHOOD: [IVec2;9] = [IVec2::new(-1,-1), IVec2::new( 0,-1), IVec2::new( 1,-1),  // NW, N, NE
+	const NEIGHBORHOOD: [IVec2;5] = [                   IVec2::new( 0,-1),                     // NW, N, NE
 	                                 IVec2::new(-1, 0), IVec2::ZERO,       IVec2::new( 1, 0),  // W,  X, E
-	                                 IVec2::new(-1, 1), IVec2::new( 0, 1), IVec2::new( 1, 1)]; // SW, S, SE
+	                                                    IVec2::new( 0, 1)];                    // SW, S, SE
 
 	let (size, start, end, start_blizzards) = {
 	    // Load file from command-line argument or (if -) stdin
@@ -126,7 +126,7 @@ fn main() -> Result<(), Error> {
 	};
 
 	fn manhattan(v:IVec2) -> i32 { v.x.abs() + v.y.abs() }
-	let mut target_time = manhattan(end-start) as usize; // Look, a "heuristic"
+	let mut target_time = (manhattan(end-start) as usize)*2; // Look, a "heuristic"
 
 	let mut timeline: Vec<Moment> = vec![Moment{ blizzards:start_blizzards, blizzards_map:start_blizzards_map }];
 	let mut nav_tree: MultiMap<IVec3, IVec3> = Default::default();
