@@ -36,21 +36,19 @@ fn to_snafu(mut i:i64) -> String {
 	if i<0 { panic!("Currently don't support negative numbers ({})", i) }
 	if i == 0 { return "0".to_string() }
 	let mut result: Vec<char> = Default::default();
-	let mut carry = false;
-	while i > 0 {
-		let digit = i%5;
-		carry = i > 2;
+	while i>0 {
+		i += 2; // This feels wrong but it works.
+		let digit = i.rem_euclid(5);
 		i /= 5;
 		result.push(match digit {
-			0 => '0',
-			1 => '1',
-			2 => '2',
-			3 => {i -= 2; '='},
-			4 => {i -= 1; '-'},
+			0 => '=',
+			1 => '-',
+			2 => '0',
+			3 => '1',
+			4 => '2',
 			_ => panic!("Unreachable")
 		});
 	}
-	if carry { result.push('1') }
 	result.iter().rev().collect::<String>()
 }
 
