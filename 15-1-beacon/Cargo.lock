@@ -9,6 +9,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "beacon"
+version = "0.1.0"
+dependencies = [
+ "either",
+ "glam",
+ "pom",
+ "range-set",
+]
+
+[[package]]
 name = "either"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -34,16 +44,6 @@ name = "pom"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "07e2192780e9f8e282049ff9bffcaa28171e1cb0844f49ed5374e518ae6024ec"
-
-[[package]]
-name = "range"
-version = "0.1.0"
-dependencies = [
- "either",
- "glam",
- "pom",
- "range-set",
-]
 
 [[package]]
 name = "range-set"
